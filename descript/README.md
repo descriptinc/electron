@@ -21,6 +21,7 @@
 - `electron-remove-pre-commit-hooks.patch`
   - Author: Pat
   - Avoids certain actions for pushing
+  - *NOTE*: Do not sommit this change to the branch
 - `perf-patch-libuv-to-use-posix_spawn-on-macOS.patch`
   - Author: Pat
   - Fixes bug on macOS where spawning new processes in `libuv` was taking a ton of time
