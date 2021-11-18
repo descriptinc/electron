@@ -10,6 +10,7 @@ import sys
 #   Constants
 #
 cwd = os.path.dirname(os.path.realpath(__file__))
+descript_electron_fork = 'git@github.com:descriptinc/electron.git'
 
 
 #
@@ -79,6 +80,40 @@ def getElectronBuildConfiguration(log_file, build_tools) -> str:
 
     return root
 
+#
+#
+#
+def redirectGitOrigin(log_file, fork):
+    log_file.write(f'\nRedirecting Git origin to: {fork}\n')
+    log_file.write('=======================\n')
+    args = ['/usr/bin/which', 'git']
+    log_file.write(f"{' '.join(args)}\n")
+    git_path = ''
+    
+    try:
+        output = subprocess.check_output(args)
+        git_path = output.decode('utf-8').strip()
+        log_file.write(f'{git_path}\n')
+    except subprocess.CalledProcessError as e:
+        log_file.write('Error: Git not Installed!\n')
+        raise(e)
+
+    args = [git_path, 'remote', 'set-url', 'origin', fork]
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    log_file.write(f"{output.decode('utf-8')}\n")
+
+    args = [git_path, 'remote', 'set-url', '--push', 'origin', fork]
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    log_file.write(f"{output.decode('utf-8')}\n")
+    
+    # Verify results
+    args = [git_path, 'remote', '-v']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    log_file.write(f"{output.decode('utf-8')}\n")
+
 
 #
 #   Calls `e sync` which calls `gclient` under the hood
@@ -87,26 +122,25 @@ def getElectronBuildConfiguration(log_file, build_tools) -> str:
 def synchronizeCode(log_file, build_tools):
     log_file.write('\nSyncing Code\n')
     log_file.write('=======================\n')
-    log_file.flush()
 
     args = [build_tools, 'sync', '--verbose']
     log_file.write(f"{' '.join(args)}\n")
-    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-    log_file.write(f"{output.decode('utf-8')}\n")
+    log_file.flush()
+    subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
 
 
 #
-#   Build Electron
+#   Build Electron which calls 'ninja' under the hood
+#   See https://ninja-build.org
 #
 def buildElectron(log_file, build_tools):
     log_file.write('\nBuilding Electron\n')
     log_file.write('=======================\n')
-    log_file.flush()
 
-    args = [build_tools, 'build', 'electron:dist']
+    args = [build_tools, 'build', 'electron:dist', '-v']
     log_file.write(f"{' '.join(args)}\n")
-    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-    log_file.write(f"{output.decode('utf-8')}\n")
+    log_file.flush()
+    subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
 
 #
 #   Verifies the built executable exists
@@ -158,6 +192,12 @@ def main():
     root = getElectronBuildConfiguration(build_electron_log_file, build_tools)
 
     synchronizeCode(build_electron_log_file, build_tools)
+
+    redirectGitOrigin(build_electron_log_file, descript_electron_fork)
+
+    # Switch to root directory of tree
+    # otherwise certain build commands fail
+    os.chdir(root)
 
     buildElectron(build_electron_log_file, build_tools)
 
