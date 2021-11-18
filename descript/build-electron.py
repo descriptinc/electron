@@ -56,18 +56,86 @@ def getElectronBuildConfiguration(log_file, build_tools) -> str:
     log_file.write('\nChecking Electron Build Configuration\n')
     log_file.write('=======================\n')
 
+    args = [build_tools, 'show', 'root']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    root = output.decode('utf-8').strip()
+    log_file.write(f"{root}\n\n")
+
     args = [build_tools, 'show', 'current']
     log_file.write(f"{' '.join(args)}\n")
     output = subprocess.check_output(args)
     log_file.write(f"{output.decode('utf-8')}\n")
 
-    args = [build_tools, 'show', 'root']
+    args = [build_tools, 'show', 'depotdir']
     log_file.write(f"{' '.join(args)}\n")
     output = subprocess.check_output(args)
-    root = output.decode('utf-8').strip()
-    log_file.write(f"{root}\n")
+    log_file.write(f"{output.decode('utf-8')}\n")
+
+    args = [build_tools, 'show', 'env']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    log_file.write(f"{output.decode('utf-8')}\n")
 
     return root
+
+
+#
+#   Calls `e sync` which calls `gclient` under the hood
+#   See https://www.chromium.org/developers/how-tos/depottools
+#
+def synchronizeCode(log_file, build_tools):
+    log_file.write('\nSyncing Code\n')
+    log_file.write('=======================\n')
+    log_file.flush()
+
+    args = [build_tools, 'sync', '--verbose']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+    log_file.write(f"{output.decode('utf-8')}\n")
+
+
+#
+#   Build Electron
+#
+def buildElectron(log_file, build_tools):
+    log_file.write('\nBuilding Electron\n')
+    log_file.write('=======================\n')
+    log_file.flush()
+
+    args = [build_tools, 'build', 'electron:dist']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
+    log_file.write(f"{output.decode('utf-8')}\n")
+
+#
+#   Verifies the built executable exists
+#   and launches it to grab the version
+#   @return the path to the built executable
+#
+def verifyElectronExecutable(log_file, build_tools) -> str:
+    log_file.write('\nChecking Electron Executable\n')
+    log_file.write('=======================\n')
+
+    args = [build_tools, 'show', 'exe']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    result = output.decode('utf-8').strip()
+    log_file.write(f"{result}\n\n")
+
+    # launch and print version
+    args = [result, '-v']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    log_file.write(f"{output.decode('utf-8')}\n")
+
+    # launch and print Node ABI Version
+    args = [result, '-a']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    log_file.write(f"{output.decode('utf-8')}\n")
+
+    return result
 
 #
 #
@@ -88,6 +156,12 @@ def main():
     build_tools = getElectronBuildToolsPath(build_electron_log_file)
 
     root = getElectronBuildConfiguration(build_electron_log_file, build_tools)
+
+    synchronizeCode(build_electron_log_file, build_tools)
+
+    buildElectron(build_electron_log_file, build_tools)
+
+    verifyElectronExecutable(build_electron_log_file, build_tools)
 
     build_electron_log_file.write('\nEnd of build-electron.py\n')
     build_electron_log_file.write('=======================\n')
