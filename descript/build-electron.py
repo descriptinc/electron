@@ -29,6 +29,7 @@ def readVersion() -> str:
 
 #
 #   Checks for the existance of the electron build tools
+#   See https://github.com/electron/build-tools
 #   @return path to electron build tools
 #
 def getElectronBuildToolsPath(log_file) -> str:
@@ -123,7 +124,7 @@ def synchronizeCode(log_file, build_tools):
     log_file.write('\nSyncing Code\n')
     log_file.write('=======================\n')
 
-    args = [build_tools, 'sync', '--verbose']
+    args = [build_tools, 'sync', '-vvvv']
     log_file.write(f"{' '.join(args)}\n")
     log_file.flush()
     subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
