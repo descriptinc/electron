@@ -136,9 +136,14 @@ def synchronizeCode():
     print('\nSyncing Code')
     print('=======================')
 
+    env = os.environ
+    if platform.machine() == 'arm64':
+        # https://bugs.chromium.org/p/chromium/issues/detail?id=1103236
+        env['VPYTHON_BYPASS'] = 'manually managed python not supported by chrome operations'
+
     args = ['e', 'sync', '-vvvv']
     print(f"{' '.join(args)}\n")
-    subprocess.run(args, check=True)
+    subprocess.run(args, check=True, env=env)
 
 
 #
@@ -219,7 +224,7 @@ def main():
 
     fetchAndPullGit(electron_submodule_path, descript_electron_fork)
 
-    print('\nEnd of build-electron.py')
+    print('\nEnd of bootstrap-electron.py')
     print('=======================')
 
 
