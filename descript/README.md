@@ -4,6 +4,11 @@
   - [Charles Van Winkle](https://github.com/cvanwinkle)
   - [Pat DeSantis](https://github.com/pdesantis) 
 
+## Instructions
+- If starting from scratch:
+  - run `bootstrap.electron.py` to setup `build-tools`, a source tree, and patches
+- Then
+  - run `build-electron.py`
 ## Overview
 - Check prerequisites
   - Electron Build Tools
