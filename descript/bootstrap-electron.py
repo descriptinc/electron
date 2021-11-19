@@ -178,6 +178,10 @@ def fetchAndPullGit(electron_path, fork):
 
     os.chdir(electron_path)
 
+    args = ['git', 'fetch']
+    print(f"\n{' '.join(args)}")
+    subprocess.run(args, check=True)
+
     branch = ''
     while not len(branch):
         branch = input(f'\nPlease input desired branch to checkout [{descript_default_branch}]:  ')
@@ -205,7 +209,7 @@ def main():
 
     root = setupElectronBuildConfiguration()
 
-    #synchronizeCode()
+    synchronizeCode()
 
     electron_submodule_path = getElectronSubmodulePath(root)
 
