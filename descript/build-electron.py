@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import pathlib
 import platform
 import shutil
 import subprocess
@@ -16,10 +17,13 @@ electron_build_tools_module = '@electron/build-tools'
 
 
 #
-#   Read the version string from ../ELECTRON_VERSION
-#   @return the electron version
+#
 #
 def readVersion() -> str:
+    """
+    Read the version string from ../ELECTRON_VERSION
+    :return: the electron version
+    """
     result = ''
     with open(os.path.join(os.path.dirname(cwd), 'ELECTRON_VERSION')) as f:
         lines = f.readlines()
@@ -30,10 +34,26 @@ def readVersion() -> str:
 
 
 #
-#   Installs electron build tools
-#   See https://github.com/electron/build-tools
+#
+#
+def getProcessorArch() -> str:
+    """
+    Gets the current processor architecture
+    :return: `'x64'` or `'arm64'`
+    """ 
+    result = platform.machine()
+    if result == 'x86_64':
+        result = 'x64'
+    return result
+
+#
+#
 #
 def installElectronBuildTools(log_file):
+    """
+    Installs electron build tools
+    See https://github.com/electron/build-tools
+    """
     log_file.write('\nInstalling Electron Build Tools\n')
     log_file.write('=======================\n')
     
@@ -48,13 +68,17 @@ def installElectronBuildTools(log_file):
 
 
 #
-#   Checks for the existance of the electron build tools
-#   if not installed, tries to install the build tools once
-#   and will throw if still not found
-#   See https://github.com/electron/build-tools
-#   @return path to electron build tools
+#
 #
 def getElectronBuildToolsPath(log_file, throw_if_not_found = True) -> str:
+    """
+    Checks for the existance of the electron build tools
+    if not installed, tries to install the build tools once
+    and will throw if still not found
+    See https://github.com/electron/build-tools
+    
+    :return: path to electron build tools
+    """
     result = ''
     
     log_file.write('\nChecking for Electron Build Tools\n')
@@ -80,10 +104,13 @@ def getElectronBuildToolsPath(log_file, throw_if_not_found = True) -> str:
 
 
 #
-#   Get Build Configuration
-#   @return root
+#
 #
 def getElectronBuildConfiguration(log_file, build_tools) -> str:
+    """
+    Get Build Configuration
+    :return: `root` folder for current Electron Build Configuration
+    """
     log_file.write('\nChecking Electron Build Configuration\n')
     log_file.write('=======================\n')
 
@@ -115,6 +142,10 @@ def getElectronBuildConfiguration(log_file, build_tools) -> str:
 #
 #
 def redirectGitOrigin(log_file, fork):
+    """
+    Redirects the git remote origin back to the specified fork
+    (as opposed to the official electron repo)
+    """
     log_file.write(f'\nRedirecting Git origin to: {fork}\n')
     log_file.write('=======================\n')
 
@@ -136,10 +167,13 @@ def redirectGitOrigin(log_file, fork):
 
 
 #
-#   Calls `e sync` which calls `gclient` under the hood
-#   See https://www.chromium.org/developers/how-tos/depottools
+#
 #
 def synchronizeCode(log_file, build_tools):
+    """
+    Calls `e sync` which calls `gclient` under the hood
+    See https://www.chromium.org/developers/how-tos/depottools
+    """
     log_file.write('\nSyncing Code\n')
     log_file.write('=======================\n')
 
@@ -150,10 +184,13 @@ def synchronizeCode(log_file, build_tools):
 
 
 #
-#   Build Electron which calls 'ninja' under the hood
-#   See https://ninja-build.org
+#
 #
 def buildElectron(log_file, build_tools):
+    """
+    Build Electron which calls `ninja` under the hood
+    See https://ninja-build.org
+    """
     log_file.write('\nBuilding Electron\n')
     log_file.write('=======================\n')
 
@@ -164,11 +201,14 @@ def buildElectron(log_file, build_tools):
 
 
 #
-#   Verifies the built executable exists
-#   and launches it to grab the version
-#   @return the path to the output dir
+#
 #
 def verifyElectronExecutable(log_file, build_tools) -> str:
+    """
+    Verifies the built executable exists
+    and launches it to grab the version
+    :return: the path to the output dir
+    """
     log_file.write('\nChecking Electron Executable\n')
     log_file.write('=======================\n')
 
@@ -176,13 +216,13 @@ def verifyElectronExecutable(log_file, build_tools) -> str:
     log_file.write(f"{' '.join(args)}\n")
     output = subprocess.check_output(args)
     result = output.decode('utf-8').strip()
-    log_file.write(f"{result}\n\n")
+    log_file.write(f"{result}n")
 
     args = [build_tools, 'show', 'exe']
     log_file.write(f"{' '.join(args)}\n")
     output = subprocess.check_output(args)
     exe = output.decode('utf-8').strip()
-    log_file.write(f"{exe}\n\n")
+    log_file.write(f"{exe}\n")
 
     # launch and print version
     args = [exe, '-v']
@@ -202,46 +242,146 @@ def verifyElectronExecutable(log_file, build_tools) -> str:
 #
 #
 #
-def copyElectronDistribution(log_file, src, dest):
+def copyElectronDistribution(log_file, src, dest) -> str:
+    """
+    Copies the electron distribution zip
+    to our output folder and calculates a checksum
+    and places that in the output folder as well
+    :return: the path the the destination zip file
+    """
     log_file.write('\nCopying Electron Distribution\n')
     log_file.write('=======================\n')
 
-    if not os.path.exists(dest):
-        os.makedirs(dest)
-
-    arch = platform.machine()
-    if arch == 'x86_64':
-        arch = 'x64'
-
+    # Copy dist.zip
     src_file = os.path.join(src, 'dist.zip')
-    dest_file = os.path.join(dest, f'electron-v{readVersion()}-{sys.platform}-{arch}.zip')
-
-    log_file.write(f'{src_file} --> {dest_file}\n')
+    dest_file = os.path.join(dest, f'electron-v{readVersion()}-{sys.platform}-{getProcessorArch()}.zip')
+    log_file.write(f'Copying {src_file} --> {dest_file}\n')
     shutil.copy2(src_file, dest_file)
 
-    # shasum -a 256 dist.zip
-    # 9bdc192adbe6839056b97f1eace2103479c47260311a37117f95ce64b31b6576 *electron-v13.1.6-darwin-x64.zip
-    # SHASUMS256.txt
+    # Calculate checksum
+    checksum_file_path = os.path.join(dest, 'SHAMSUM256.txt')
+    log_file.write(f'Creating checksum: {checksum_file_path}\n')
 
-    # symbols
-    # dest_file-symbols.zip
-    # cp -r PATH_TO_ELECTRON_OUT/Release/**/*.dSYM PATH_TO_SYMBOLS_FOLDER
+    args = ['shasum', '-a', '256', src_file]
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    checksum = output.decode('utf-8')
+    log_file.write(f"{checksum}\n")
+
+    # replace absolute path to just filename
+    # From: '0a88d3f97f356c6a42449fd548f9b586f565899144849019014e36c7683b745e  /Users/cvanwink/Source/git/electron/src/out/Testing/dist.zip'
+    # To:   '0a88d3f97f356c6a42449fd548f9b586f565899144849019014e36c7683b745e  *electron-v13.1.6-darwin-x64.zip'
+    checksum = checksum.replace(src_file, f'*{os.path.basename(dest_file)}')
+    log_file.write(f"{checksum}\n")
+    
+    # Write Checksum to file
+    checksum_file = open(checksum_file_path, 'w')
+    checksum_file.write(checksum)
+    checksum_file.close()
+
+    return dest_file
+
+
+#
+#
+#
+def symbolNameFromFile(pe_file) -> str:
+    """
+    Returns the name for the symbol file which should be
+    generated for any particular pe_file, taking into account
+    files which are inside packages like `.app`, `.framework`, `.bundle`, etc
+    """
+    result = os.path.basename(pe_file)
+    file_ref = pathlib.Path(pe_file)
+    pe_path_parts = file_ref.parts
+
+    known_bundles = ['app', 'framework', 'bundle']
+    for bundle_type in known_bundles:
+        try:
+            bundle_name = f'{file_ref.stem}.{bundle_type}'
+            bundle_index = pe_path_parts.index(bundle_name)
+            result = bundle_name
+            break
+        except ValueError as e:
+            continue
+    return result + '.dSYM'
+
+#
+#
+#
+def packageSymbols(log_file, dest):
+    """
+    Finds all of the symbols in `src`
+    and zips them into a single .zip in `dest`
+    :param: dest -- the output folder for the symbols zip
+    """
+    log_file.write('\nBundling Symbol Files\n')
+    log_file.write('=======================\n')
+    
+    # get executable path
+    args = ['e', 'show', 'exe']
+    output = subprocess.check_output(args)
+    exe_path = output.decode('utf-8').strip()
+    try:
+        # get parent .app bundle from path
+        exe_ref = pathlib.Path(exe_path)
+        exe_path_parts = exe_ref.parts
+        app_bundle_index = exe_path_parts.index(f'{exe_ref.stem}.app')
+        exe_path_parts = exe_path_parts[:app_bundle_index + 1]
+        exe_path = os.path.join(*exe_path_parts)
+    except ValueError as e:
+        raise e
+
+    # scan executable path for all PE files
+    pe_files = set()
+    for (dirpath, dirnames, filenames) in os.walk(exe_path):
+        for file in filenames:
+            file_path = os.path.join(dirpath, file)
+            if not os.path.islink(file_path):
+                args = ['file', '-b', file_path]
+                output = subprocess.check_output(args)
+                file_type = output.decode('utf-8').strip()
+                if file_type.startswith('Mach-O'):
+                    log_file.write(f'{file_path}\t{file_type}\n')
+                    pe_files.add(file_path)
+
+    symbol_temp_folder = os.path.join(dest, 'symbol_temp')
+    if (os.path.exists(symbol_temp_folder)):
+        shutil.rmtree(symbol_temp_folder)
+    os.makedirs(symbol_temp_folder)
+
+    # generate a symbol for each PE file
+    symbol_files = set()
+    for pe_file in sorted(pe_files, key=lambda s: str(s).lower()):
+        symbol_path = os.path.join(symbol_temp_folder, symbolNameFromFile(pe_file))
+        args = ['dsymutil', os.path.normpath(pe_file), '-o', os.path.normpath(symbol_path)]
+        log_file.write(f"{' '.join(args)}\n")
+        log_file.flush()
+        subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
+        symbol_files.add(symbol_path)
+    
+    # zip each symbol file
+    dest_file = os.path.join(dest, f'electron-v{readVersion()}-{sys.platform}-{getProcessorArch()}-symbols')
+    log_file.write(f'Creating {dest_file}.zip\n')
+    shutil.make_archive(dest_file, 'zip', symbol_temp_folder)
+    
+    shutil.rmtree(symbol_temp_folder)
 
 #
 #
 #
 def main():
-    log_dir = os.path.join(cwd, 'logs')
-    if os.path.exists(log_dir):
-        shutil.rmtree(log_dir)
-    os.makedirs(log_dir)
+    output_dir = os.path.join(cwd, 'out')
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir, ignore_errors=True)
+    os.makedirs(output_dir)
 
     # change to directory of script
     os.chdir(cwd)
 
     # create a log file for archival purposes
-    log_file_name = f'build-electron-{readVersion()}-{sys.platform}-{platform.machine()}.log.txt'
-    build_electron_log_file = open(os.path.join(log_dir, log_file_name), 'w')
+    log_file_name = f'build-electron-{readVersion()}-{sys.platform}-{getProcessorArch()}.log.txt'
+    build_electron_log_file = open(os.path.join(output_dir, log_file_name), 'w')
 
     build_electron_log_file.write('Begin build-electron.py\n')
     build_electron_log_file.write('=======================\n')
@@ -260,9 +400,11 @@ def main():
 
     buildElectron(build_electron_log_file, build_tools)
 
-    output_dir = verifyElectronExecutable(build_electron_log_file, build_tools)
+    build_dir = verifyElectronExecutable(build_electron_log_file, build_tools)
 
-    copyElectronDistribution(build_electron_log_file, output_dir, os.path.join(cwd, 'out'))
+    electron_zip = copyElectronDistribution(build_electron_log_file, build_dir, output_dir)
+
+    packageSymbols(build_electron_log_file, output_dir)
 
     build_electron_log_file.write('\nEnd of build-electron.py\n')
     build_electron_log_file.write('=======================\n')
