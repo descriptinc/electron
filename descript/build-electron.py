@@ -6,6 +6,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from zipfile import ZipFile
 
 
 #
@@ -238,6 +239,36 @@ def verifyElectronExecutable(log_file, build_tools) -> str:
 
     return result
 
+#
+#
+#
+def generateChecksum(output_folder):
+    """
+    Calculates checksums for every file in `output_folder`
+    """
+
+    checksums = set()
+
+    # calculate checksums for all files
+    for (dirpath, dirnames, filenames) in os.walk(output_folder):
+        for file in filenames:
+            args = ['shasum', '-a', '256', os.path.join(dirpath, file)]
+            output = subprocess.check_output(args)
+            checksum = output.decode('utf-8').strip()
+
+            # replace absolute path to just filename
+            # From: '0a88d3f97f356c6a42449fd548f9b586f565899144849019014e36c7683b745e  /Users/cvanwink/Source/git/electron/src/out/Testing/dist.zip'
+            # To:   '0a88d3f97f356c6a42449fd548f9b586f565899144849019014e36c7683b745e  *electron-v13.1.6-darwin-x64.zip'
+            checksum = checksum.replace(os.path.join(dirpath, ''), '*')
+            checksums.add(checksum)
+    
+    # Write Checksums to file
+    checksum_file_path = os.path.join(output_folder, 'SHAMSUM256.txt')
+    checksum_file = open(checksum_file_path, 'w')
+    for checksum in checksums:
+        checksum_file.write(f'{checksum}\n')
+    checksum_file.close()
+
 
 #
 #
@@ -257,27 +288,6 @@ def copyElectronDistribution(log_file, src, dest) -> str:
     dest_file = os.path.join(dest, f'electron-v{readVersion()}-{sys.platform}-{getProcessorArch()}.zip')
     log_file.write(f'Copying {src_file} --> {dest_file}\n')
     shutil.copy2(src_file, dest_file)
-
-    # Calculate checksum
-    checksum_file_path = os.path.join(dest, 'SHAMSUM256.txt')
-    log_file.write(f'Creating checksum: {checksum_file_path}\n')
-
-    args = ['shasum', '-a', '256', src_file]
-    log_file.write(f"{' '.join(args)}\n")
-    output = subprocess.check_output(args)
-    checksum = output.decode('utf-8')
-    log_file.write(f"{checksum}\n")
-
-    # replace absolute path to just filename
-    # From: '0a88d3f97f356c6a42449fd548f9b586f565899144849019014e36c7683b745e  /Users/cvanwink/Source/git/electron/src/out/Testing/dist.zip'
-    # To:   '0a88d3f97f356c6a42449fd548f9b586f565899144849019014e36c7683b745e  *electron-v13.1.6-darwin-x64.zip'
-    checksum = checksum.replace(src_file, f'*{os.path.basename(dest_file)}')
-    log_file.write(f"{checksum}\n")
-    
-    # Write Checksum to file
-    checksum_file = open(checksum_file_path, 'w')
-    checksum_file.write(checksum)
-    checksum_file.close()
 
     return dest_file
 
@@ -380,8 +390,9 @@ def main():
     os.chdir(cwd)
 
     # create a log file for archival purposes
-    log_file_name = f'build-electron-{readVersion()}-{sys.platform}-{getProcessorArch()}.log.txt'
-    build_electron_log_file = open(os.path.join(output_dir, log_file_name), 'w')
+    log_file_name = f'electron-v{readVersion()}-{sys.platform}-{getProcessorArch()}-log.txt'
+    log_file_path = os.path.join(output_dir, log_file_name)
+    build_electron_log_file = open(log_file_path, 'w')
 
     build_electron_log_file.write('Begin build-electron.py\n')
     build_electron_log_file.write('=======================\n')
@@ -409,6 +420,13 @@ def main():
     build_electron_log_file.write('\nEnd of build-electron.py\n')
     build_electron_log_file.write('=======================\n')
     build_electron_log_file.close()
+
+    # zip up log file
+    with ZipFile(os.path.splitext(log_file_path)[0] + '.zip', 'w') as myzip:
+        myzip.write(log_file_path, os.path.basename(log_file_path))
+    os.remove(log_file_path)
+
+    generateChecksum(output_dir)
 
 
 #
