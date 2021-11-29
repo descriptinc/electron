@@ -37,6 +37,10 @@ The build script automates the following basic operations.
 - Zips up the log file
 - Generates SHA 256 checksums for the build, log, and symbol archives
 
+## Development
+Known issues:
+- There are warnings for pre-commit hooks when commiting to our branches within our custom fork of Electron. These are currently to be ignored.
+
 ## Patches
 - `electron-remove-pre-commit-hooks.patch`
   - Author: [Pat DeSantis](https://github.com/pdesantis)
