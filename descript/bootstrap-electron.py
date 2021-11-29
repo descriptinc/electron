@@ -10,7 +10,8 @@ import sys
 #
 #   Constants
 #
-descript_electron_fork = 'git@github.com:descriptinc/electron.git'
+descript_electron_fork = 'https://github.com/descriptinc/electron.git'
+descript_electron_fork_ssh = 'git@github.com:descriptinc/electron.git'
 descript_default_branch = 'release/15.3.1/libuv-use-posix-spawn.0'
 
 
@@ -85,7 +86,10 @@ def initializeElectronSource():
             else:
                 path =''
 
-    config = input('\nPlease enter the name of the desired build configuration [testing]:  ')
+    print ('\nInitialize Electron configuration:')
+    print ('For more information, see `e init` here: https://github.com/electron/build-tools')
+    print ('`testing` is the default, but could be used to maintain both debug/release builds.')
+    config = input('\nPlease enter the name of the desired build configuration. [testing]:  ')
     if not len(config):
         config = 'testing'
 
@@ -102,13 +106,19 @@ def setupElectronBuildConfiguration() -> str:
     print('=======================')
 
     root = ''
+    should_offer_override_once = True
     while not len(root):
         args = ['e', 'show', 'root']
         print(f"\n{' '.join(args)}")
         try:
             output = subprocess.check_output(args)
             root = output.decode('utf-8').strip()
-            print(f"{root}")
+            if should_offer_override_once:
+                override = input(f'\nFound root at {root}. Override? [N]:  ')
+                if len(override) and override.lower() == 'y':
+                    should_offer_override_once = False
+                    initializeElectronSource()
+                    root = ''
         except subprocess.CalledProcessError as e:
             initializeElectronSource()
             root = ''
@@ -151,6 +161,48 @@ def synchronizeCode():
 #
 def getElectronSubmodulePath(root) -> str:
     return os.path.join(root, 'src', 'electron')
+
+
+#
+#   Queries the user for a custom fork for electron
+#   Defaults to Descript's custom fork
+#
+def getCustomElectronFork(electron_path) -> str:
+    print(f'\nChoose a custom Electron Fork')
+    print('=======================')
+
+    forks = [
+        descript_electron_fork,
+        descript_electron_fork_ssh
+        ]
+
+    i = 0
+    for fork in forks:
+        print (f'[{i}]\t{fork}')
+        i += 1
+    print (f'[{i}]\t(Custom)')
+    custom_fork_index = i
+
+    fork = ''
+    while not len(fork):
+        fork = input(f'\nPlease input desired fork [0]:  ')
+        if not len(fork):
+            fork = descript_electron_fork
+        elif not fork.isnumeric():
+            fork = ''
+            continue
+        else:
+            fork_index = int(fork)
+            if (fork_index < 0) or (custom_fork_index < fork_index):
+                # out of range 
+                fork = ''
+            elif fork_index < i:
+                fork = forks[fork_index]
+            elif fork_index == custom_fork_index:
+                # custom fork
+                fork = input(f"\nPlease input desired fork (e.g. '{descript_electron_fork}'):  ")
+            
+    return fork
 
 #
 #   Switches the git origin to specified fork
@@ -218,11 +270,13 @@ def main():
 
     electron_submodule_path = getElectronSubmodulePath(root)
 
+    custom_fork = getCustomElectronFork(electron_submodule_path)
+
     # switch the electron submodule to our fork
     # this needs to be done after calling synchronizeCode()
-    redirectGitOrigin(electron_submodule_path, descript_electron_fork)
+    redirectGitOrigin(electron_submodule_path, custom_fork)
 
-    fetchAndPullGit(electron_submodule_path, descript_electron_fork)
+    fetchAndPullGit(electron_submodule_path, custom_fork)
 
     print('\nEnd of bootstrap-electron.py')
     print('=======================')
