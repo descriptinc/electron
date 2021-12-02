@@ -88,12 +88,12 @@ def initializeElectronSource():
 
     print ('\nInitialize Electron configuration:')
     print ('For more information, see `e init` here: https://github.com/electron/build-tools')
-    print ('`testing` is the default, but could be used to maintain both debug/release builds.')
-    config = input('\nPlease enter the name of the desired build configuration. [testing]:  ')
+    print ('`release` is the default, but could be used to maintain both testings/release builds.')
+    config = input('\nPlease enter the name of the desired build configuration. [release]:  ')
     if not len(config):
-        config = 'testing'
+        config = 'release'
 
-    args = ['e', 'init', '--root', path, config]
+    args = ['e', 'init', config, '-i', config, '--root', path]
     print(f"\n{' '.join(args)}")
     subprocess.run(args, check=True)
 
