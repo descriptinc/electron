@@ -317,6 +317,32 @@ def symbolNameFromFile(pe_file) -> str:
     return result + '.dSYM'
 
 #
+#   Takes a PE file and returns the DWARF symbol UUID
+#   which may be used to find a pre-existing symbol file
+#
+def getSymbolUUID(log_file, pe_file) -> str:
+    args = ['dwarfdump', '-uuid', os.path.normpath(pe_file)]
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    uuid_result = output.decode('utf-8').strip()    # e.g. "UUID: 44DE7410-80FA-39FD-AAA7-9E3C424DDEF7 (arm64) ./foo/bar.dylib"
+    log_file.write(f"{uuid_result}\n")
+    return uuid_result.split()[1]
+
+#
+#   Takes a UUID in the form of '44DE7410-80FA-39FD-AAA7-9E3C424DDEF'
+#   and returns a path to corresponding dSYM package (if found)
+#
+def findSymbolFile(log_file, uuid) -> str:
+    args = ['mdfind', f'com_apple_xcode_dsym_uuids == {uuid}']
+    log_file.write(f"{' '.join(args)}\n")
+    output = subprocess.check_output(args)
+    dsym_result = output.decode('utf-8').strip()
+    if len(dsym_result):
+        log_file.write(f"{dsym_result}\n")
+    return dsym_result
+
+
+#
 #
 #
 def packageSymbols(log_file, dest):
@@ -360,15 +386,34 @@ def packageSymbols(log_file, dest):
         shutil.rmtree(symbol_temp_folder)
     os.makedirs(symbol_temp_folder)
 
-    # generate a symbol for each PE file
-    symbol_files = set()
+    uuids = set()
+
+    # copy or generate a symbol for each PE file
     for pe_file in sorted(pe_files, key=lambda s: str(s).lower()):
-        symbol_path = os.path.join(symbol_temp_folder, symbolNameFromFile(pe_file))
-        args = ['dsymutil', os.path.normpath(pe_file), '-o', os.path.normpath(symbol_path)]
-        log_file.write(f"{' '.join(args)}\n")
-        log_file.flush()
-        subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
-        symbol_files.add(symbol_path)
+        # find a pre-existing symbol file
+        uuid = getSymbolUUID(log_file, pe_file)
+        symbol_path = ''
+        if len(uuid):
+            if uuid in uuids:
+                # we've already copied this one
+                continue
+            else:
+                symbol_path = findSymbolFile(log_file, uuid)
+            
+        if len(symbol_path):
+            dest_symbol_path = os.path.join(symbol_temp_folder, os.path.basename(symbol_path))
+            log_file.write(f'Copying {symbol_path} --> {dest_symbol_path}\n')
+            shutil.copytree(symbol_path, dest_symbol_path)
+        else:
+            # if we didn't find a symbol, generate one
+            symbol_path = os.path.join(symbol_temp_folder, symbolNameFromFile(pe_file))
+            args = ['dsymutil', os.path.normpath(pe_file), '-o', os.path.normpath(symbol_path)]
+            log_file.write(f"{' '.join(args)}\n")
+            log_file.flush()
+            subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
+
+        if len(uuid):
+            uuids.add(uuid)
     
     # zip each symbol file
     dest_file = os.path.join(dest, f'electron-v{readVersion()}-{sys.platform}-{getProcessorArch()}-symbols')
