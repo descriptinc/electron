@@ -445,6 +445,24 @@ def packageSymbols(log_file, build_dir, dest):
     
     shutil.rmtree(symbol_temp_folder)
 
+
+#
+#
+#
+def resetXcode():
+    """
+    calls `xcode-select -r` but requires sudo.
+    typically: `/Applications/Xcode.app/Contents/Developer`
+    """
+    print ('\nResetting Xcode path to default (/Applications/Xcode.app/Contents/Developer)')
+    args = ['sudo', '/usr/bin/xcode-select', '-r']
+    subprocess.run(args)
+
+    args = ['xcode-select', '-p']
+    output = subprocess.check_output(args)
+    print(output.decode('utf-8'))
+
+
 #
 #
 #
@@ -495,6 +513,11 @@ def main():
     os.remove(log_file_path)
 
     generateChecksum(output_dir)
+
+    # reset xcode dev tools path to default instead of 
+    # electron's custom Xcode installation
+    resetXcode()
+
 
 
 #
