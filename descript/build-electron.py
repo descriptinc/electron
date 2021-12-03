@@ -217,25 +217,25 @@ def verifyElectronExecutable(log_file, build_tools) -> str:
     log_file.write(f"{' '.join(args)}\n")
     output = subprocess.check_output(args)
     result = output.decode('utf-8').strip()
-    log_file.write(f"{result}n")
+    log_file.write(f"{result}\n")
 
     args = [build_tools, 'show', 'exe']
-    log_file.write(f"{' '.join(args)}\n")
+    log_file.write(f"\n{' '.join(args)}\n")
     output = subprocess.check_output(args)
     exe = output.decode('utf-8').strip()
     log_file.write(f"{exe}\n")
 
     # launch and print version
     args = [exe, '-v']
-    log_file.write(f"{' '.join(args)}\n")
-    output = subprocess.check_output(args)
-    log_file.write(f"{output.decode('utf-8')}\n")
+    log_file.write(f"\n{' '.join(args)}\n")
+    log_file.flush()
+    subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
 
     # launch and print Node ABI Version
     args = [exe, '-a']
-    log_file.write(f"{' '.join(args)}\n")
-    output = subprocess.check_output(args)
-    log_file.write(f"{output.decode('utf-8')}\n")
+    log_file.write(f"\n{' '.join(args)}\n")
+    log_file.flush()
+    subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
 
     return result
 
@@ -317,35 +317,57 @@ def symbolNameFromFile(pe_file) -> str:
     return result + '.dSYM'
 
 #
-#   Takes a PE file and returns the DWARF symbol UUID
-#   which may be used to find a pre-existing symbol file
 #
-def getSymbolUUID(log_file, pe_file) -> str:
-    args = ['dwarfdump', '-uuid', os.path.normpath(pe_file)]
-    log_file.write(f"{' '.join(args)}\n")
+#
+def getSymbolUUID(log_file, pe_or_symbol_file, write_to_log = True) -> str:
+    """
+    Takes a PE file and returns the DWARF symbol UUID
+    which may be used to find a pre-existing symbol file
+    """
+    args = ['dwarfdump', '-uuid', os.path.normpath(pe_or_symbol_file)]
+    if (write_to_log):
+        log_file.write(f"\n{' '.join(args)}\n")
     output = subprocess.check_output(args)
     uuid_result = output.decode('utf-8').strip()    # e.g. "UUID: 44DE7410-80FA-39FD-AAA7-9E3C424DDEF7 (arm64) ./foo/bar.dylib"
-    log_file.write(f"{uuid_result}\n")
+    if (write_to_log):
+        log_file.write(f"{uuid_result}\n")
     return uuid_result.split()[1]
 
 #
-#   Takes a UUID in the form of '44DE7410-80FA-39FD-AAA7-9E3C424DDEF'
-#   and returns a path to corresponding dSYM package (if found)
 #
-def findSymbolFile(log_file, uuid) -> str:
+#
+def findSymbolFile(log_file, build_dir, uuid) -> str:
+    """
+    Takes a UUID in the form of `'44DE7410-80FA-39FD-AAA7-9E3C424DDEF'`
+    and returns a path to corresponding dSYM package (if found)
+    It first tries to find via mdfind, but that might not work if
+    the machine ran out of memory during building and linking. So
+    manually search `build_dir` as a fallback.
+    """
     args = ['mdfind', f'com_apple_xcode_dsym_uuids == {uuid}']
-    log_file.write(f"{' '.join(args)}\n")
+    log_file.write(f"\n{' '.join(args)}\n")
     output = subprocess.check_output(args)
     dsym_result = output.decode('utf-8').strip()
     if len(dsym_result):
         log_file.write(f"{dsym_result}\n")
+    else:
+        # fallback to manual search of build_dir
+        for (dirpath, dirnames, filenames) in os.walk(build_dir):
+            for dirname in dirnames:
+                if dirname.endswith('.dSYM'):
+                    temp_dsym_path = os.path.join(dirpath, dirname)
+                    test_uuid = getSymbolUUID(log_file, temp_dsym_path, False)
+                    if test_uuid == uuid:
+                        dsym_result = temp_dsym_path
+                        break
+    
     return dsym_result
 
 
 #
 #
 #
-def packageSymbols(log_file, dest):
+def packageSymbols(log_file, build_dir, dest):
     """
     Finds all of the symbols in `src`
     and zips them into a single .zip in `dest`
@@ -387,6 +409,7 @@ def packageSymbols(log_file, dest):
     os.makedirs(symbol_temp_folder)
 
     uuids = set()
+    
 
     # copy or generate a symbol for each PE file
     for pe_file in sorted(pe_files, key=lambda s: str(s).lower()):
@@ -398,7 +421,7 @@ def packageSymbols(log_file, dest):
                 # we've already copied this one
                 continue
             else:
-                symbol_path = findSymbolFile(log_file, uuid)
+                symbol_path = findSymbolFile(log_file, build_dir, uuid)
             
         if len(symbol_path):
             dest_symbol_path = os.path.join(symbol_temp_folder, os.path.basename(symbol_path))
@@ -408,7 +431,7 @@ def packageSymbols(log_file, dest):
             # if we didn't find a symbol, generate one
             symbol_path = os.path.join(symbol_temp_folder, symbolNameFromFile(pe_file))
             args = ['dsymutil', os.path.normpath(pe_file), '-o', os.path.normpath(symbol_path)]
-            log_file.write(f"{' '.join(args)}\n")
+            log_file.write(f"\n{' '.join(args)}\n")
             log_file.flush()
             subprocess.run(args, stdout=log_file, stderr=log_file, check=True)
 
@@ -417,7 +440,7 @@ def packageSymbols(log_file, dest):
     
     # zip each symbol file
     dest_file = os.path.join(dest, f'electron-v{readVersion()}-{sys.platform}-{getProcessorArch()}-symbols')
-    log_file.write(f'Creating {dest_file}.zip\n')
+    log_file.write(f'\nCreating {dest_file}.zip\n')
     shutil.make_archive(dest_file, 'zip', symbol_temp_folder)
     
     shutil.rmtree(symbol_temp_folder)
@@ -460,7 +483,7 @@ def main():
 
     electron_zip = copyElectronDistribution(build_electron_log_file, build_dir, output_dir)
 
-    packageSymbols(build_electron_log_file, output_dir)
+    packageSymbols(build_electron_log_file, build_dir, output_dir)
 
     build_electron_log_file.write('\nEnd of build-electron.py\n')
     build_electron_log_file.write('=======================\n')
