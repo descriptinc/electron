@@ -40,6 +40,10 @@ The build script automates the following basic operations.
 ## Development
 Known issues:
 - There are warnings for pre-commit hooks when commiting to our branches within our custom fork of Electron. These are currently to be ignored.
+- If you need to fetch upstream from `electron/electron`, you may need to run the following commands:
+  - `git remote add upstream https://github.com/electron/electron.git`
+  - `git fetch upstream`
+  - `git push`
 
 ## Patches
 - `electron-remove-pre-commit-hooks.patch`
