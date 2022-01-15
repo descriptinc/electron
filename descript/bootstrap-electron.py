@@ -67,7 +67,7 @@ def setupElectronBuildTools(throw_if_not_found = True) -> str:
 #
 #   Initializes a root for Electron's source
 #
-def initializeElectronSource():
+def initializeElectronSource(force = False):
     print('\nInitialize Build Configuration')
     print('=======================')
 
@@ -93,7 +93,12 @@ def initializeElectronSource():
     if not len(config):
         config = 'release'
 
-    args = ['e', 'init', config, '-i', config, '--root', path]
+    args = ['e', 'init', config, '-i', config]
+    if (force):
+        args.append('--force')
+
+    args.extend(['--root', path])
+    
     print(f"\n{' '.join(args)}")
     subprocess.run(args, check=True)
 
@@ -117,7 +122,7 @@ def setupElectronBuildConfiguration() -> str:
                 override = input(f'\nFound root at {root}. Override? [N]:  ')
                 if len(override) and override.lower() == 'y':
                     should_offer_override_once = False
-                    initializeElectronSource()
+                    initializeElectronSource(force=True)
                     root = ''
         except subprocess.CalledProcessError as e:
             initializeElectronSource()
