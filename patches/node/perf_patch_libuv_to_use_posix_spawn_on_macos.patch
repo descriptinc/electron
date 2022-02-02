@@ -16,6 +16,7 @@ PR-URL: https://github.com/libuv/libuv/pull/3064
 
 Authored-by: Juan Pablo Canepa <jpcanepa@gmail.com>
 Co-authored-by: Marcello Bastéa-Forte <marcello@descript.com>
+Updated-by: Charles Van Winkle <charles@descript.com>
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
 index 8f94c53b249978c8ce41dc2447facbbcf585120a..a3619ca78d46bc620491fcaeeb898e4b54b13c63 100644
@@ -50,26 +51,7 @@ index 8f94c53b249978c8ce41dc2447facbbcf585120a..a3619ca78d46bc620491fcaeeb898e4b
  #else
  extern char **environ;
  #endif
-@@ -44,7 +57,6 @@ extern char **environ;
- # include <grp.h>
- #endif
- 
--
- static void uv__chld(uv_signal_t* handle, int signum) {
-   uv_process_t* process;
-   uv_loop_t* loop;
-@@ -302,9 +314,8 @@ static void uv__process_child_init(const uv_process_options_t* options,
-     _exit(127);
-   }
- 
--  if (options->env != NULL) {
-+  if (options->env != NULL)
-     environ = options->env;
--  }
- 
-   /* Reset signal disposition.  Use a hard-coded limit because NSIG
-    * is not fixed on Linux: it's either 32, 34 or 64, depending on
-@@ -343,6 +354,476 @@ static void uv__process_child_init(const uv_process_options_t* options,
+@@ -342,6 +355,476 @@ static void uv__process_child_init(const uv_process_options_t* options,
  #endif
  
  
@@ -546,7 +528,7 @@ index 8f94c53b249978c8ce41dc2447facbbcf585120a..a3619ca78d46bc620491fcaeeb898e4b
  int uv_spawn(uv_loop_t* loop,
               uv_process_t* process,
               const uv_process_options_t* options) {
-@@ -424,21 +905,16 @@ int uv_spawn(uv_loop_t* loop,
+@@ -423,21 +906,16 @@ int uv_spawn(uv_loop_t* loop,
  
    /* Acquire write lock to prevent opening new fds in worker threads */
    uv_rwlock_wrlock(&loop->cloexec_lock);
