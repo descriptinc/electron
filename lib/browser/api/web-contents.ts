@@ -1,10 +1,10 @@
-import { app, ipcMain, session, webFrameMain } from 'electron/main';
+import { app, ipcMain, session, deprecate, webFrameMain } from 'electron/main';
 import type { BrowserWindowConstructorOptions, LoadURLOptions } from 'electron/main';
 
 import * as url from 'url';
 import * as path from 'path';
 import { openGuestWindow, makeWebPreferences, parseContentTypeFormat } from '@electron/internal/browser/guest-window-manager';
-import { parseFeatures } from '@electron/internal/common/parse-features-string';
+import { parseFeatures } from '@electron/internal/browser/parse-features-string';
 import { ipcMainInternal } from '@electron/internal/browser/ipc-main-internal';
 import * as ipcMainUtils from '@electron/internal/browser/ipc-main-internal-utils';
 import { MessagePortMain } from '@electron/internal/browser/message-port-main';
@@ -391,6 +391,17 @@ WebContents.prototype.getPrinters = function () {
   }
 };
 
+WebContents.prototype.getPrintersAsync = async function () {
+  // TODO(nornagon): this API has nothing to do with WebContents and should be
+  // moved.
+  if (printing.getPrinterListAsync) {
+    return printing.getPrinterListAsync();
+  } else {
+    console.error('Error: Printing feature is disabled.');
+    return [];
+  }
+};
+
 WebContents.prototype.loadFile = function (filePath, options = {}) {
   if (typeof filePath !== 'string') {
     throw new Error('Must pass filePath as a string');
@@ -723,6 +734,11 @@ WebContents.prototype._init = function () {
         }
       });
     });
+
+    const prefs = this.getLastWebPreferences() || {};
+    if (prefs.nativeWindowOpen === false) {
+      deprecate.log('Deprecation Warning: Disabling nativeWindowOpen is deprecated. The nativeWindowOpen option will be removed in Electron 18.');
+    }
   }
 
   this.on('login', (event, ...args) => {

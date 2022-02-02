@@ -240,6 +240,12 @@ step-depot-tools-get: &step-depot-tools-get
     name: Get depot tools
     command: |
       git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+      # remove ninjalog_uploader_wrapper.py from autoninja since we don't use it and it causes problems
+      if [ "`uname`" == "Darwin" ]; then
+        sed -i '' '/ninjalog_uploader_wrapper.py/d' ./depot_tools/autoninja
+      else
+        sed -i '/ninjalog_uploader_wrapper.py/d' ./depot_tools/autoninja
+      fi
 
 step-depot-tools-add-to-path: &step-depot-tools-add-to-path
   run:
@@ -447,15 +453,19 @@ step-install-npm-deps-on-mac: &step-install-npm-deps-on-mac
 
 # This step handles the differences between the linux "gclient sync"
 # and the expected state on macOS
-step-fix-sync-on-mac: &step-fix-sync-on-mac
+step-fix-sync: &step-fix-sync
   run:
-    name: Fix Sync on Mac
+    name: Fix Sync
     command: |
       if [ "`uname`" == "Darwin" ]; then
         # Fix Clang Install (wrong binary)
         rm -rf src/third_party/llvm-build
-        python src/tools/clang/scripts/update.py
+        python3 src/tools/clang/scripts/update.py
       fi
+
+      cd src/third_party/angle
+      git remote set-url origin https://chromium.googlesource.com/angle/angle.git
+      git fetch
 
 step-install-signing-cert-on-mac: &step-install-signing-cert-on-mac
   run:
@@ -1037,7 +1047,7 @@ steps-electron-ts-compile-for-doc-change: &steps-electron-ts-compile-for-doc-cha
     - *step-setup-goma-for-build
     - *step-get-more-space-on-mac
     - *step-install-npm-deps-on-mac
-    - *step-fix-sync-on-mac
+    - *step-fix-sync
     - *step-gn-gen-default
 
     #Compile ts/js to verify doc change didn't break anything
@@ -1384,7 +1394,7 @@ commands:
             - *step-setup-env-for-build
             - *step-setup-goma-for-build
             - *step-get-more-space-on-mac
-            - *step-fix-sync-on-mac
+            - *step-fix-sync
             - *step-delete-git-directories
 
             # Electron app
@@ -1488,7 +1498,7 @@ commands:
             - *step-gclient-sync
             - *step-delete-git-directories
             - *step-minimize-workspace-size-from-checkout
-      - *step-fix-sync-on-mac
+      - *step-fix-sync
       - *step-setup-env-for-build
       - *step-setup-goma-for-build
       - *step-gn-gen-default
@@ -1537,6 +1547,7 @@ jobs:
     environment:
       <<: *env-linux-medium
       <<: *env-testing-build
+      GCLIENT_EXTRA_ARGS: '--custom-var=checkout_arm=True --custom-var=checkout_arm64=True'
     <<: *steps-electron-ts-compile-for-doc-change
 
   # Layer 1: Checkout.

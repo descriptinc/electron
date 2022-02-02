@@ -126,9 +126,6 @@ const char kNodeIntegration[] = "nodeIntegration";
 // Enable context isolation of Electron APIs and preload script
 const char kContextIsolation[] = "contextIsolation";
 
-// Instance ID of guest WebContents.
-const char kGuestInstanceID[] = "guestInstanceId";
-
 // Web runtime features.
 const char kExperimentalFeatures[] = "experimentalFeatures";
 
@@ -243,8 +240,6 @@ const char kAppUserModelId[] = "app-user-model-id";
 
 // The application path
 const char kAppPath[] = "app-path";
-
-const char kEnableApiFilteringLogging[] = "enable-api-filtering-logging";
 
 // The command line switch versions of the options.
 const char kScrollBounce[] = "scroll-bounce";

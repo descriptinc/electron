@@ -5,6 +5,7 @@
 #include "shell/browser/serial/serial_chooser_context_factory.h"
 
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
+#include "shell/browser/electron_browser_context.h"
 #include "shell/browser/serial/serial_chooser_context.h"
 
 namespace electron {

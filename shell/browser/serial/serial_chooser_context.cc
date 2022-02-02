@@ -4,6 +4,7 @@
 
 #include "shell/browser/serial/serial_chooser_context.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -49,7 +50,7 @@ base::UnguessableToken DecodeToken(base::StringPiece input) {
     return base::UnguessableToken();
   }
 
-  const auto* data = reinterpret_cast<const uint64_t*>(buffer.data());
+  const uint64_t* data = reinterpret_cast<const uint64_t*>(buffer.data());
   return base::UnguessableToken::Deserialize(data[0], data[1]);
 }
 
@@ -94,36 +95,18 @@ void SerialChooserContext::GrantPortPermission(
     const device::mojom::SerialPortInfo& port,
     content::RenderFrameHost* render_frame_host) {
   base::Value value = PortInfoToValue(port);
-  port_info_.insert({port.token, value.Clone()});
-
-  if (CanStorePersistentEntry(port)) {
-    auto* web_contents =
-        content::WebContents::FromRenderFrameHost(render_frame_host);
-    auto* permission_helper =
-        WebContentsPermissionHelper::FromWebContents(web_contents);
-    permission_helper->GrantSerialPortPermission(origin, std::move(value),
-                                                 render_frame_host);
-    return;
-  }
-
-  ephemeral_ports_[origin].insert(port.token);
+  auto* web_contents =
+      content::WebContents::FromRenderFrameHost(render_frame_host);
+  auto* permission_helper =
+      WebContentsPermissionHelper::FromWebContents(web_contents);
+  permission_helper->GrantSerialPortPermission(origin, std::move(value),
+                                               render_frame_host);
 }
 
 bool SerialChooserContext::HasPortPermission(
     const url::Origin& origin,
     const device::mojom::SerialPortInfo& port,
     content::RenderFrameHost* render_frame_host) {
-  auto it = ephemeral_ports_.find(origin);
-  if (it != ephemeral_ports_.end()) {
-    const std::set<base::UnguessableToken> ports = it->second;
-    if (base::Contains(ports, port.token))
-      return true;
-  }
-
-  if (!CanStorePersistentEntry(port)) {
-    return false;
-  }
-
   auto* web_contents =
       content::WebContents::FromRenderFrameHost(render_frame_host);
   auto* permission_helper =
@@ -193,8 +176,6 @@ void SerialChooserContext::OnPortRemoved(
     device::mojom::SerialPortInfoPtr port) {
   for (auto& observer : port_observer_list_)
     observer.OnPortRemoved(*port);
-
-  port_info_.erase(port->token);
 }
 
 void SerialChooserContext::EnsurePortManagerConnection() {
@@ -220,10 +201,6 @@ void SerialChooserContext::SetUpPortManagerConnection(
 void SerialChooserContext::OnPortManagerConnectionError() {
   port_manager_.reset();
   client_receiver_.reset();
-
-  port_info_.clear();
-
-  ephemeral_ports_.clear();
 }
 
 }  // namespace electron

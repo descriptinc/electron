@@ -64,7 +64,7 @@ void ElectronRenderFrameObserver::DidClearWindowObject() {
   auto* web_frame =
       static_cast<blink::WebLocalFrameImpl*>(render_frame_->GetWebFrame());
   if (has_delayed_node_initialization_ && web_frame->Opener() &&
-      web_frame->HasCommittedFirstRealLoad()) {
+      !web_frame->IsOnInitialEmptyDocument()) {
     v8::Isolate* isolate = blink::MainThreadIsolate();
     v8::HandleScope handle_scope(isolate);
     v8::MicrotasksScope microtasks_scope(
@@ -95,7 +95,7 @@ void ElectronRenderFrameObserver::DidInstallConditionalFeatures(
   // acutal page has started to load.
   auto* web_frame =
       static_cast<blink::WebLocalFrameImpl*>(render_frame_->GetWebFrame());
-  if (web_frame->Opener() && !web_frame->HasCommittedFirstRealLoad()) {
+  if (web_frame->Opener() && web_frame->IsOnInitialEmptyDocument()) {
     // FIXME(zcbenz): Chromium does not do any browser side navigation for
     // window.open('about:blank'), so there is no way to override WebPreferences
     // of it. We should not delay Node.js initialization as there will be no

@@ -110,6 +110,14 @@ describe('BrowserWindow module', () => {
       await closed;
     });
 
+    it('closes window without rounded corners', async () => {
+      await closeWindow(w);
+      w = new BrowserWindow({ show: false, frame: false, roundedCorners: false });
+      const closed = emittedOnce(w, 'closed');
+      w.close();
+      await closed;
+    });
+
     it('should not crash if called after webContents is destroyed', () => {
       w.webContents.destroy();
       w.webContents.on('destroyed', () => w.close());
@@ -1110,7 +1118,7 @@ describe('BrowserWindow module', () => {
           await unmaximize;
           expectBoundsEqual(w.getNormalBounds(), bounds);
         });
-        it('can check transparent window maximization', async () => {
+        it('correctly checks transparent window maximization state', async () => {
           w.destroy();
           w = new BrowserWindow({
             show: false,
@@ -1119,12 +1127,12 @@ describe('BrowserWindow module', () => {
             transparent: true
           });
 
-          const maximize = emittedOnce(w, 'resize');
+          const maximize = emittedOnce(w, 'maximize');
           w.show();
           w.maximize();
           await maximize;
           expect(w.isMaximized()).to.equal(true);
-          const unmaximize = emittedOnce(w, 'resize');
+          const unmaximize = emittedOnce(w, 'unmaximize');
           w.unmaximize();
           await unmaximize;
           expect(w.isMaximized()).to.equal(false);
@@ -1640,7 +1648,15 @@ describe('BrowserWindow module', () => {
   });
 
   ifdescribe(process.platform === 'darwin')('BrowserWindow.setVibrancy(type)', () => {
-    afterEach(closeAllWindows);
+    let appProcess: childProcess.ChildProcessWithoutNullStreams | undefined;
+
+    afterEach(() => {
+      if (appProcess && !appProcess.killed) {
+        appProcess.kill();
+        appProcess = undefined;
+      }
+      closeAllWindows();
+    });
 
     it('allows setting, changing, and removing the vibrancy', () => {
       const w = new BrowserWindow({ show: false });
@@ -1658,6 +1674,15 @@ describe('BrowserWindow module', () => {
       expect(() => {
         w.setVibrancy('i-am-not-a-valid-vibrancy-type' as any);
       }).to.not.throw();
+    });
+
+    it('Allows setting a transparent window via CSS', async () => {
+      const appPath = path.join(__dirname, 'fixtures', 'apps', 'background-color-transparent');
+
+      appProcess = childProcess.spawn(process.execPath, [appPath]);
+
+      const [code] = await emittedOnce(appProcess, 'exit');
+      expect(code).to.equal(0);
     });
   });
 
@@ -2466,14 +2491,14 @@ describe('BrowserWindow module', () => {
         });
 
         const preloadPath = path.join(fixtures, 'api', 'new-window-preload.js');
-        w.webContents.setWindowOpenHandler(() => ({ action: 'allow', overrideBrowserWindowOptions: { webPreferences: { preload: preloadPath, foo: 'bar' } } }));
+        w.webContents.setWindowOpenHandler(() => ({ action: 'allow', overrideBrowserWindowOptions: { webPreferences: { preload: preloadPath, contextIsolation: false } } }));
         w.loadFile(path.join(fixtures, 'api', 'new-window.html'));
         const [[, childWebContents]] = await Promise.all([
           emittedOnce(app, 'web-contents-created'),
           emittedOnce(ipcMain, 'answer')
         ]);
         const webPreferences = childWebContents.getLastWebPreferences();
-        expect(webPreferences.foo).to.equal('bar');
+        expect(webPreferences.contextIsolation).to.equal(false);
       });
 
       it('should set ipc event sender correctly', async () => {
@@ -2735,7 +2760,7 @@ describe('BrowserWindow module', () => {
           overrideBrowserWindowOptions: {
             webPreferences: {
               preload: preloadPath,
-              foo: 'bar'
+              contextIsolation: false
             }
           }
         }));
@@ -2745,7 +2770,7 @@ describe('BrowserWindow module', () => {
           emittedOnce(ipcMain, 'answer')
         ]);
         const webPreferences = childWebContents.getLastWebPreferences();
-        expect(webPreferences.foo).to.equal('bar');
+        expect(webPreferences.contextIsolation).to.equal(false);
       });
 
       describe('window.location', () => {
@@ -3216,6 +3241,19 @@ describe('BrowserWindow module', () => {
       await maximize;
     });
 
+    it('emits an event when a transparent window is maximized', async () => {
+      const w = new BrowserWindow({
+        show: false,
+        frame: false,
+        transparent: true
+      });
+
+      const maximize = emittedOnce(w, 'maximize');
+      w.show();
+      w.maximize();
+      await maximize;
+    });
+
     it('emits only one event when frameless window is maximized', () => {
       const w = new BrowserWindow({ show: false, frame: false });
       let emitted = 0;
@@ -3230,6 +3268,22 @@ describe('BrowserWindow module', () => {
       const unmaximize = emittedOnce(w, 'unmaximize');
       w.show();
       w.maximize();
+      w.unmaximize();
+      await unmaximize;
+    });
+
+    it('emits an event when a transparent window is unmaximized', async () => {
+      const w = new BrowserWindow({
+        show: false,
+        frame: false,
+        transparent: true
+      });
+
+      const maximize = emittedOnce(w, 'maximize');
+      const unmaximize = emittedOnce(w, 'unmaximize');
+      w.show();
+      w.maximize();
+      await maximize;
       w.unmaximize();
       await unmaximize;
     });
@@ -3402,6 +3456,29 @@ describe('BrowserWindow module', () => {
       const initialPosition = w.getPosition();
       w.maximize();
       w.unmaximize();
+      expectBoundsEqual(w.getPosition(), initialPosition);
+    });
+
+    // TODO(dsanders11): Enable once minimize event works on Linux again.
+    //                   See https://github.com/electron/electron/issues/28699
+    ifit(process.platform !== 'linux')('should not restore a minimized window', async () => {
+      const w = new BrowserWindow();
+      const minimize = emittedOnce(w, 'minimize');
+      w.minimize();
+      await minimize;
+      w.unmaximize();
+      await delay(1000);
+      expect(w.isMinimized()).to.be.true();
+    });
+
+    it('should not change the size or position of a normal window', async () => {
+      const w = new BrowserWindow();
+
+      const initialSize = w.getSize();
+      const initialPosition = w.getPosition();
+      w.unmaximize();
+      await delay(1000);
+      expectBoundsEqual(w.getSize(), initialSize);
       expectBoundsEqual(w.getPosition(), initialPosition);
     });
   });
@@ -4569,9 +4646,9 @@ describe('BrowserWindow module', () => {
       w1.loadURL('about:blank');
       const w2 = new BrowserWindow({ x: 300, y: 300, width: 300, height: 200 });
       w2.loadURL('about:blank');
+      const w1Focused = emittedOnce(w1, 'focus');
       w1.webContents.focus();
-      // Give focus some time to switch to w1
-      await delay();
+      await w1Focused;
       expect(w1.webContents.isFocused()).to.be.true('focuses window');
     });
   });

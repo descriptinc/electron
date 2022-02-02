@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTEXT_H_
-#define SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTEXT_H_
+#ifndef ELECTRON_SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTEXT_H_
+#define ELECTRON_SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTEXT_H_
 
 #include <map>
 #include <set>
@@ -18,6 +18,7 @@
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "services/device/public/mojom/serial.mojom-forward.h"
+#include "shell/browser/electron_browser_context.h"
 #include "third_party/blink/public/mojom/serial/serial.mojom.h"
 #include "url/gurl.h"
 #include "url/origin.h"
@@ -50,6 +51,10 @@ class SerialChooserContext : public KeyedService,
   SerialChooserContext();
   ~SerialChooserContext() override;
 
+  // disable copy
+  SerialChooserContext(const SerialChooserContext&) = delete;
+  SerialChooserContext& operator=(const SerialChooserContext&) = delete;
+
   // Serial-specific interface for granting and checking permissions.
   void GrantPortPermission(const url::Origin& origin,
                            const device::mojom::SerialPortInfo& port,
@@ -77,21 +82,13 @@ class SerialChooserContext : public KeyedService,
       mojo::PendingRemote<device::mojom::SerialPortManager> manager);
   void OnPortManagerConnectionError();
 
-  // Tracks the set of ports to which an origin has access to.
-  std::map<url::Origin, std::set<base::UnguessableToken>> ephemeral_ports_;
-
-  // Holds information about ports in |ephemeral_ports_|.
-  std::map<base::UnguessableToken, base::Value> port_info_;
-
   mojo::Remote<device::mojom::SerialPortManager> port_manager_;
   mojo::Receiver<device::mojom::SerialPortManagerClient> client_receiver_{this};
   base::ObserverList<PortObserver> port_observer_list_;
 
   base::WeakPtrFactory<SerialChooserContext> weak_factory_{this};
-
-  DISALLOW_COPY_AND_ASSIGN(SerialChooserContext);
 };
 
 }  // namespace electron
 
-#endif  // SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTEXT_H_
+#endif  // ELECTRON_SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTEXT_H_

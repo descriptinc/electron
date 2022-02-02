@@ -2,8 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#ifndef SHELL_BROWSER_NATIVE_WINDOW_H_
-#define SHELL_BROWSER_NATIVE_WINDOW_H_
+#ifndef ELECTRON_SHELL_BROWSER_NATIVE_WINDOW_H_
+#define ELECTRON_SHELL_BROWSER_NATIVE_WINDOW_H_
 
 #include <list>
 #include <memory>
@@ -56,6 +56,10 @@ class NativeWindow : public base::SupportsUserData,
                      public views::WidgetDelegate {
  public:
   ~NativeWindow() override;
+
+  // disable copy
+  NativeWindow(const NativeWindow&) = delete;
+  NativeWindow& operator=(const NativeWindow&) = delete;
 
   // Create window with existing WebContents, the caller is responsible for
   // managing the window's live.
@@ -327,6 +331,7 @@ class NativeWindow : public base::SupportsUserData,
   bool has_frame() const { return has_frame_; }
   void set_has_frame(bool has_frame) { has_frame_ = has_frame; }
 
+  bool has_client_frame() const { return has_client_frame_; }
   bool transparent() const { return transparent_; }
   bool enable_larger_than_screen() const { return enable_larger_than_screen_; }
 
@@ -372,6 +377,11 @@ class NativeWindow : public base::SupportsUserData,
   // Whether window has standard frame.
   bool has_frame_ = true;
 
+  // Whether window has standard frame, but it's drawn by Electron (the client
+  // application) instead of the OS. Currently only has meaning on Linux for
+  // Wayland hosts.
+  bool has_client_frame_ = false;
+
   // Whether window is transparent.
   bool transparent_ = false;
 
@@ -412,8 +422,6 @@ class NativeWindow : public base::SupportsUserData,
   gfx::Rect overlay_rect_;
 
   base::WeakPtrFactory<NativeWindow> weak_factory_{this};
-
-  DISALLOW_COPY_AND_ASSIGN(NativeWindow);
 };
 
 // This class provides a hook to get a NativeWindow from a WebContents.
@@ -438,4 +446,4 @@ class NativeWindowRelay
 
 }  // namespace electron
 
-#endif  // SHELL_BROWSER_NATIVE_WINDOW_H_
+#endif  // ELECTRON_SHELL_BROWSER_NATIVE_WINDOW_H_

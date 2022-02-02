@@ -37,15 +37,25 @@ BrowserWindow::BrowserWindow(gin::Arguments* args,
       gin::Dictionary::CreateEmpty(isolate);
   options.Get(options::kWebPreferences, &web_preferences);
 
-  // Copy the backgroundColor to webContents.
-  v8::Local<v8::Value> value;
-  if (options.Get(options::kBackgroundColor, &value))
-    web_preferences.Set(options::kBackgroundColor, value);
+  bool transparent = false;
+  options.Get(options::kTransparent, &transparent);
 
-  // Copy the transparent setting to webContents
-  v8::Local<v8::Value> transparent;
-  if (options.Get("transparent", &transparent))
-    web_preferences.Set("transparent", transparent);
+  std::string vibrancy_type;
+#if defined(OS_MAC)
+  options.Get(options::kVibrancyType, &vibrancy_type);
+#endif
+
+  // Copy the backgroundColor to webContents.
+  std::string color;
+  if (options.Get(options::kBackgroundColor, &color)) {
+    web_preferences.SetHidden(options::kBackgroundColor, color);
+  } else if (!vibrancy_type.empty() || transparent) {
+    // If the BrowserWindow is transparent or a vibrancy type has been set,
+    // also propagate transparency to the WebContents unless a separate
+    // backgroundColor has been set.
+    web_preferences.SetHidden(options::kBackgroundColor,
+                              ToRGBAHex(SK_ColorTRANSPARENT));
+  }
 
   // Copy the show setting to webContents, but only if we don't want to paint
   // when initially hidden
@@ -70,6 +80,7 @@ BrowserWindow::BrowserWindow(gin::Arguments* args,
 
   // Copy the webContents option to webPreferences. This is only used internally
   // to implement nativeWindowOpen option.
+  v8::Local<v8::Value> value;
   if (options.Get("webContents", &value)) {
     web_preferences.SetHidden("webContents", value);
   }
@@ -360,15 +371,21 @@ void BrowserWindow::Blur() {
 
 void BrowserWindow::SetBackgroundColor(const std::string& color_name) {
   BaseWindow::SetBackgroundColor(color_name);
-  web_contents()->SetPageBaseBackgroundColor(ParseHexColor(color_name));
+  SkColor color = ParseHexColor(color_name);
+  web_contents()->SetPageBaseBackgroundColor(color);
+  auto* rwhv = web_contents()->GetRenderWidgetHostView();
+  if (rwhv) {
+    rwhv->SetBackgroundColor(color);
+    static_cast<content::RenderWidgetHostViewBase*>(rwhv)
+        ->SetContentBackgroundColor(color);
+  }
   // Also update the web preferences object otherwise the view will be reset on
   // the next load URL call
   if (api_web_contents_) {
     auto* web_preferences =
         WebContentsPreferences::From(api_web_contents_->web_contents());
     if (web_preferences) {
-      web_preferences->preference()->SetStringKey(options::kBackgroundColor,
-                                                  color_name);
+      web_preferences->SetBackgroundColor(ParseHexColor(color_name));
     }
   }
 }
@@ -458,7 +475,7 @@ void BrowserWindow::ScheduleUnresponsiveEvent(int ms) {
       &BrowserWindow::NotifyWindowUnresponsive, GetWeakPtr()));
   base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
       FROM_HERE, window_unresponsive_closure_.callback(),
-      base::TimeDelta::FromMilliseconds(ms));
+      base::Milliseconds(ms));
 }
 
 void BrowserWindow::NotifyWindowUnresponsive() {

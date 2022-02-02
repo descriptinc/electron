@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: VerteDinde <keeleymhammond@gmail.com>
-Date: Tue, 19 Oct 2021 17:55:57 -0700
+From: VerteDinde <khammond@slack-corp.com>
+Date: Tue, 19 Oct 2021 16:56:25 -0700
 Subject: fix: mas gate private enterprise APIs
 
 Beginning in Electron 15.2.0, Chromium moved several formerly public

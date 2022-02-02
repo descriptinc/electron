@@ -2,13 +2,12 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#ifndef SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTROLLER_H_
-#define SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTROLLER_H_
+#ifndef ELECTRON_SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTROLLER_H_
+#define ELECTRON_SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTROLLER_H_
 
 #include <string>
 #include <vector>
 
-#include "base/macros.h"
 #include "base/memory/weak_ptr.h"
 #include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/serial_chooser.h"
@@ -40,6 +39,10 @@ class SerialChooserController final : public SerialChooserContext::PortObserver,
       base::WeakPtr<ElectronSerialDelegate> serial_delegate);
   ~SerialChooserController() override;
 
+  // disable copy
+  SerialChooserController(const SerialChooserController&) = delete;
+  SerialChooserController& operator=(const SerialChooserController&) = delete;
+
   // SerialChooserContext::PortObserver:
   void OnPortAdded(const device::mojom::SerialPortInfo& port) override;
   void OnPortRemoved(const device::mojom::SerialPortInfo& port) override;
@@ -65,10 +68,8 @@ class SerialChooserController final : public SerialChooserContext::PortObserver,
   content::GlobalRenderFrameHostId render_frame_host_id_;
 
   base::WeakPtrFactory<SerialChooserController> weak_factory_{this};
-
-  DISALLOW_COPY_AND_ASSIGN(SerialChooserController);
 };
 
 }  // namespace electron
 
-#endif  // SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTROLLER_H_
+#endif  // ELECTRON_SHELL_BROWSER_SERIAL_SERIAL_CHOOSER_CONTROLLER_H_

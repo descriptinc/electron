@@ -227,7 +227,8 @@ describe('<webview> tag', function () {
     });
   });
 
-  it('loads devtools extensions registered on the parent window', async () => {
+  // This test is flaky on WOA, so skip it there.
+  ifit(process.platform !== 'win32' || process.arch !== 'arm64')('loads devtools extensions registered on the parent window', async () => {
     const w = new BrowserWindow({
       show: false,
       webPreferences: {
@@ -255,7 +256,7 @@ describe('<webview> tag', function () {
           if (!webContents.isDestroyed() && webContents.devToolsWebContents) {
             webContents.devToolsWebContents.executeJavaScript('(' + function () {
               const { UI } = (window as any);
-              const tabs = UI.inspectorView._tabbedPane._tabs;
+              const tabs = UI.inspectorView.tabbedPane.tabs;
               const lastPanelId: any = tabs[tabs.length - 1].id;
               UI.inspectorView.showPanel(lastPanelId);
             }.toString() + ')()');

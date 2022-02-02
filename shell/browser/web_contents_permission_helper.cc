@@ -133,11 +133,11 @@ void WebContentsPermissionHelper::RequestMediaAccessPermission(
   auto media_types = std::make_unique<base::ListValue>();
   if (request.audio_type ==
       blink::mojom::MediaStreamType::DEVICE_AUDIO_CAPTURE) {
-    media_types->AppendString("audio");
+    media_types->Append("audio");
   }
   if (request.video_type ==
       blink::mojom::MediaStreamType::DEVICE_VIDEO_CAPTURE) {
-    media_types->AppendString("video");
+    media_types->Append("video");
   }
   details.SetList("mediaTypes", std::move(media_types));
   details.SetString("securityOrigin", request.security_origin.spec());
@@ -235,6 +235,6 @@ void WebContentsPermissionHelper::GrantHIDDevicePermission(
       &device, render_frame_host);
 }
 
-WEB_CONTENTS_USER_DATA_KEY_IMPL(WebContentsPermissionHelper)
+WEB_CONTENTS_USER_DATA_KEY_IMPL(WebContentsPermissionHelper);
 
 }  // namespace electron

@@ -10,6 +10,7 @@
 #include "base/callback.h"
 #include "base/files/file_util.h"
 #include "base/strings/string_util.h"
+#include "base/threading/thread_restrictions.h"
 #include "shell/browser/javascript_environment.h"
 #include "shell/browser/native_window_views.h"
 #include "shell/browser/ui/file_dialog.h"
@@ -213,6 +214,10 @@ class FileChooserDialog {
       parent_->SetEnabled(true);
   }
 
+  // disable copy
+  FileChooserDialog(const FileChooserDialog&) = delete;
+  FileChooserDialog& operator=(const FileChooserDialog&) = delete;
+
   void SetupOpenProperties(int properties) {
     const auto hasProp = [properties](OpenFileDialogProperty prop) {
       return gboolean((properties & prop) != 0);
@@ -244,13 +249,11 @@ class FileChooserDialog {
       gtk_widget_show_all(GTK_WIDGET(dialog_));
 
 #if defined(USE_X11)
-      if (!features::IsUsingOzonePlatform()) {
-        // We need to call gtk_window_present after making the widgets visible
-        // to make sure window gets correctly raised and gets focus.
-        x11::Time time = ui::X11EventSource::GetInstance()->GetTimestamp();
-        gtk_window_present_with_time(GTK_WINDOW(dialog_),
-                                     static_cast<uint32_t>(time));
-      }
+      // We need to call gtk_window_present after making the widgets visible
+      // to make sure window gets correctly raised and gets focus.
+      x11::Time time = ui::X11EventSource::GetInstance()->GetTimestamp();
+      gtk_window_present_with_time(GTK_WINDOW(dialog_),
+                                   static_cast<uint32_t>(time));
 #endif
     }
   }
@@ -313,8 +316,6 @@ class FileChooserDialog {
 
   // Callback for when we update the preview for the selection.
   CHROMEG_CALLBACK_0(FileChooserDialog, void, OnUpdatePreview, GtkFileChooser*);
-
-  DISALLOW_COPY_AND_ASSIGN(FileChooserDialog);
 };
 
 void FileChooserDialog::OnFileDialogResponse(GtkWidget* widget, int response) {

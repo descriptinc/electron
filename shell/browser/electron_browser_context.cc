@@ -113,7 +113,9 @@ ElectronBrowserContext::ElectronBrowserContext(const std::string& partition,
   // Read options.
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   use_cache_ = !command_line->HasSwitch(switches::kDisableHttpCache);
-  options.GetBoolean("cache", &use_cache_);
+  if (auto use_cache_opt = options.FindBoolKey("cache")) {
+    use_cache_ = use_cache_opt.value();
+  }
 
   base::StringToInt(command_line->GetSwitchValueASCII(switches::kDiskCacheSize),
                     &max_cache_size_);
@@ -223,7 +225,7 @@ void ElectronBrowserContext::InitPrefs() {
         base::i18n::GetConfiguredLocale());
     if (!default_code.empty()) {
       base::ListValue language_codes;
-      language_codes.AppendString(default_code);
+      language_codes.Append(default_code);
       prefs()->Set(spellcheck::prefs::kSpellCheckDictionaries, language_codes);
     }
   }
@@ -285,6 +287,11 @@ content::BrowserPluginGuestManager* ElectronBrowserContext::GetGuestManager() {
   if (!guest_manager_)
     guest_manager_ = std::make_unique<WebViewManager>();
   return guest_manager_.get();
+}
+
+content::PlatformNotificationService*
+ElectronBrowserContext::GetPlatformNotificationService() {
+  return ElectronBrowserClient::Get()->GetPlatformNotificationService();
 }
 
 content::PermissionControllerDelegate*

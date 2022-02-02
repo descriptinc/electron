@@ -31,6 +31,7 @@
 #include "chrome/common/chrome_version.h"
 #include "components/net_log/chrome_net_log.h"
 #include "components/network_hints/common/network_hints.mojom.h"
+#include "content/browser/keyboard_lock/keyboard_lock_service_impl.h"  // nogncheck
 #include "content/browser/site_instance_impl.h"  // nogncheck
 #include "content/public/browser/browser_main_runner.h"
 #include "content/public/browser/browser_ppapi_host.h"
@@ -142,6 +143,7 @@
 #include "extensions/browser/api/mime_handler_private/mime_handler_private.h"
 #include "extensions/browser/api/web_request/web_request_api.h"
 #include "extensions/browser/browser_context_keyed_api_factory.h"
+#include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_message_filter.h"
 #include "extensions/browser/extension_navigation_throttle.h"
@@ -163,6 +165,7 @@
 #include "shell/browser/extensions/electron_extension_message_filter.h"
 #include "shell/browser/extensions/electron_extension_system.h"
 #include "shell/browser/extensions/electron_extension_web_contents_observer.h"
+#include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
 #endif
 
 #if BUILDFLAG(ENABLE_PLUGINS)
@@ -194,6 +197,10 @@
 
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "shell/browser/printing/print_view_manager_electron.h"
+#endif
+
+#if BUILDFLAG(ENABLE_PDF_VIEWER)
+#include "components/pdf/browser/pdf_web_contents_helper.h"  // nogncheck
 #endif
 
 using content::BrowserThread;
@@ -444,7 +451,6 @@ void ElectronBrowserClient::OverrideWebkitPrefs(
   prefs->javascript_can_access_clipboard = true;
   prefs->local_storage_enabled = true;
   prefs->databases_enabled = true;
-  prefs->application_cache_enabled = true;
   prefs->allow_universal_access_from_file_urls = true;
   prefs->allow_file_access_from_file_urls = true;
   prefs->webgl1_enabled = true;
@@ -590,8 +596,7 @@ void ElectronBrowserClient::AppendExtraCommandLineSwitches(
         switches::kStandardSchemes,      switches::kEnableSandbox,
         switches::kSecureSchemes,        switches::kBypassCSPSchemes,
         switches::kCORSSchemes,          switches::kFetchSchemes,
-        switches::kServiceWorkerSchemes, switches::kEnableApiFilteringLogging,
-        switches::kStreamingSchemes};
+        switches::kServiceWorkerSchemes, switches::kStreamingSchemes};
     command_line->CopySwitchesFrom(*base::CommandLine::ForCurrentProcess(),
                                    kCommonSwitchNames,
                                    base::size(kCommonSwitchNames));
@@ -715,8 +720,8 @@ bool ElectronBrowserClient::CanCreateWindow(
   content::WebContents* web_contents =
       content::WebContents::FromRenderFrameHost(opener);
   WebContentsPreferences* prefs = WebContentsPreferences::From(web_contents);
-  if (prefs && prefs->IsEnabled(options::kNativeWindowOpen)) {
-    if (prefs->IsEnabled("disablePopups")) {
+  if (prefs && prefs->ShouldUseNativeWindowOpen()) {
+    if (prefs->ShouldDisablePopups()) {
       // <webview> without allowpopups attribute should return
       // null from window.open calls
       return false;
@@ -830,7 +835,7 @@ bool ElectronBrowserClient::ShouldUseProcessPerSite(
 bool ElectronBrowserClient::ArePersistentMediaDeviceIDsAllowed(
     content::BrowserContext* browser_context,
     const GURL& scope,
-    const GURL& site_for_cookies,
+    const net::SiteForCookies& site_for_cookies,
     const absl::optional<url::Origin>& top_frame_origin) {
   return true;
 }
@@ -912,8 +917,9 @@ ElectronBrowserClient::GetSystemNetworkContext() {
 
 std::unique_ptr<content::BrowserMainParts>
 ElectronBrowserClient::CreateBrowserMainParts(
-    const content::MainFunctionParams& params) {
-  auto browser_main_parts = std::make_unique<ElectronBrowserMainParts>(params);
+    content::MainFunctionParams params) {
+  auto browser_main_parts =
+      std::make_unique<ElectronBrowserMainParts>(std::move(params));
 
 #if defined(OS_MAC)
   browser_main_parts_ = browser_main_parts.get();
@@ -997,6 +1003,7 @@ bool ElectronBrowserClient::HandleExternalProtocol(
     int frame_tree_node_id,
     content::NavigationUIData* navigation_data,
     bool is_main_frame,
+    network::mojom::WebSandboxFlags sandbox_flags,
     ui::PageTransition page_transition,
     bool has_user_gesture,
     const absl::optional<url::Origin>& initiating_origin,
@@ -1039,8 +1046,7 @@ NotificationPresenter* ElectronBrowserClient::GetNotificationPresenter() {
 }
 
 content::PlatformNotificationService*
-ElectronBrowserClient::GetPlatformNotificationService(
-    content::BrowserContext* browser_context) {
+ElectronBrowserClient::GetPlatformNotificationService() {
   if (!notification_service_) {
     notification_service_ = std::make_unique<PlatformNotificationService>(this);
   }
@@ -1144,6 +1150,10 @@ class FileURLLoaderFactory : public network::SelfDeletingURLLoaderFactory {
     return pending_remote;
   }
 
+  // disable copy
+  FileURLLoaderFactory(const FileURLLoaderFactory&) = delete;
+  FileURLLoaderFactory& operator=(const FileURLLoaderFactory&) = delete;
+
  private:
   explicit FileURLLoaderFactory(
       int child_id,
@@ -1175,8 +1185,6 @@ class FileURLLoaderFactory : public network::SelfDeletingURLLoaderFactory {
   }
 
   int child_id_;
-
-  DISALLOW_COPY_AND_ASSIGN(FileURLLoaderFactory);
 };
 
 }  // namespace
@@ -1317,16 +1325,15 @@ void ElectronBrowserClient::CreateWebSocket(
 
     if (web_request_api && web_request_api->MayHaveProxies()) {
       web_request_api->ProxyWebSocket(frame, std::move(factory), url,
-                                      site_for_cookies.RepresentativeUrl(),
-                                      user_agent, std::move(handshake_client));
+                                      site_for_cookies, user_agent,
+                                      std::move(handshake_client));
       return;
     }
   }
 #endif
 
   ProxyingWebSocket::StartProxying(
-      web_request.get(), std::move(factory), url,
-      site_for_cookies.RepresentativeUrl(), user_agent,
+      web_request.get(), std::move(factory), url, site_for_cookies, user_agent,
       std::move(handshake_client), true, frame->GetProcess()->GetID(),
       frame->GetRoutingID(), frame->GetLastCommittedOrigin(), browser_context,
       &next_id_);
@@ -1419,7 +1426,7 @@ void ElectronBrowserClient::OverrideURLLoaderFactoryParams(
         blink::LocalFrameToken(factory_params->top_frame_id.value()));
     auto* web_contents = content::WebContents::FromRenderFrameHost(rfh);
     auto* prefs = WebContentsPreferences::From(web_contents);
-    if (prefs && !prefs->IsEnabled(options::kWebSecurity, true)) {
+    if (prefs && !prefs->IsWebSecurityEnabled()) {
       factory_params->is_corb_enabled = false;
       factory_params->disable_web_security = true;
     }
@@ -1430,10 +1437,9 @@ void ElectronBrowserClient::OverrideURLLoaderFactoryParams(
 }
 
 #if defined(OS_WIN)
-bool ElectronBrowserClient::PreSpawnChild(
-    sandbox::TargetPolicy* policy,
-    sandbox::policy::SandboxType sandbox_type,
-    ChildSpawnFlags flags) {
+bool ElectronBrowserClient::PreSpawnChild(sandbox::TargetPolicy* policy,
+                                          sandbox::mojom::Sandbox sandbox_type,
+                                          ChildSpawnFlags flags) {
   // Allow crashpad to communicate via named pipe.
   sandbox::ResultCode result = policy->AddRule(
       sandbox::TargetPolicy::SUBSYS_FILES,
@@ -1450,7 +1456,8 @@ bool ElectronBrowserClient::BindAssociatedReceiverFromFrame(
     mojo::ScopedInterfaceEndpointHandle* handle) {
   if (interface_name == mojom::ElectronAutofillDriver::Name_) {
     AutofillDriverFactory::BindAutofillDriver(
-        mojom::ElectronAutofillDriverAssociatedRequest(std::move(*handle)),
+        mojo::PendingAssociatedReceiver<mojom::ElectronAutofillDriver>(
+            std::move(*handle)),
         render_frame_host);
     return true;
   }
@@ -1467,6 +1474,15 @@ bool ElectronBrowserClient::BindAssociatedReceiverFromFrame(
   if (interface_name == extensions::mojom::LocalFrameHost::Name_) {
     extensions::ExtensionWebContentsObserver::BindLocalFrameHost(
         mojo::PendingAssociatedReceiver<extensions::mojom::LocalFrameHost>(
+            std::move(*handle)),
+        render_frame_host);
+    return true;
+  }
+#endif
+#if BUILDFLAG(ENABLE_PDF_VIEWER)
+  if (interface_name == pdf::mojom::PdfService::Name_) {
+    pdf::PDFWebContentsHelper::BindPdfService(
+        mojo::PendingAssociatedReceiver<pdf::mojom::PdfService>(
             std::move(*handle)),
         render_frame_host);
     return true;
@@ -1543,6 +1559,16 @@ void BindBeforeUnloadControl(
 }
 #endif
 
+void ElectronBrowserClient::ExposeInterfacesToRenderer(
+    service_manager::BinderRegistry* registry,
+    blink::AssociatedInterfaceRegistry* associated_registry,
+    content::RenderProcessHost* render_process_host) {
+#if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
+  associated_registry->AddInterface(base::BindRepeating(
+      &extensions::EventRouter::BindForRenderer, render_process_host->GetID()));
+#endif
+}
+
 void ElectronBrowserClient::RegisterBrowserInterfaceBindersForFrame(
     content::RenderFrameHost* render_frame_host,
     mojo::BinderMapWithContext<content::RenderFrameHost*>* map) {
@@ -1552,6 +1578,8 @@ void ElectronBrowserClient::RegisterBrowserInterfaceBindersForFrame(
       base::BindRepeating(&badging::BadgeManager::BindFrameReceiver));
   map->Add<electron::mojom::ElectronBrowser>(
       base::BindRepeating(&BindElectronBrowser));
+  map->Add<blink::mojom::KeyboardLockService>(base::BindRepeating(
+      &content::KeyboardLockServiceImpl::CreateMojoService));
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
   map->Add<extensions::mime_handler::MimeHandlerService>(
       base::BindRepeating(&BindMimeHandlerService));

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SHELL_BROWSER_NET_PROXYING_WEBSOCKET_H_
-#define SHELL_BROWSER_NET_PROXYING_WEBSOCKET_H_
+#ifndef ELECTRON_SHELL_BROWSER_NET_PROXYING_WEBSOCKET_H_
+#define ELECTRON_SHELL_BROWSER_NET_PROXYING_WEBSOCKET_H_
 
 #include <set>
 #include <string>
@@ -63,6 +63,10 @@ class ProxyingWebSocket : public network::mojom::WebSocketHandshakeClient,
       uint64_t* request_id_generator);
   ~ProxyingWebSocket() override;
 
+  // disable copy
+  ProxyingWebSocket(const ProxyingWebSocket&) = delete;
+  ProxyingWebSocket& operator=(const ProxyingWebSocket&) = delete;
+
   void Start();
 
   // network::mojom::WebSocketHandshakeClient methods:
@@ -95,7 +99,7 @@ class ProxyingWebSocket : public network::mojom::WebSocketHandshakeClient,
       WebRequestAPI* web_request_api,
       WebSocketFactory factory,
       const GURL& url,
-      const GURL& site_for_cookies,
+      const net::SiteForCookies& site_for_cookies,
       const absl::optional<std::string>& user_agent,
       mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
           handshake_client,
@@ -170,9 +174,8 @@ class ProxyingWebSocket : public network::mojom::WebSocketHandshakeClient,
   extensions::WebRequestInfo info_;
 
   base::WeakPtrFactory<ProxyingWebSocket> weak_factory_{this};
-  DISALLOW_COPY_AND_ASSIGN(ProxyingWebSocket);
 };
 
 }  // namespace electron
 
-#endif  // SHELL_BROWSER_NET_PROXYING_WEBSOCKET_H_
+#endif  // ELECTRON_SHELL_BROWSER_NET_PROXYING_WEBSOCKET_H_

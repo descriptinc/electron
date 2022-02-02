@@ -2,8 +2,8 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
-#ifndef SHELL_BROWSER_API_ELECTRON_API_BROWSER_VIEW_H_
-#define SHELL_BROWSER_API_ELECTRON_API_BROWSER_VIEW_H_
+#ifndef ELECTRON_SHELL_BROWSER_API_ELECTRON_API_BROWSER_VIEW_H_
+#define ELECTRON_SHELL_BROWSER_API_ELECTRON_API_BROWSER_VIEW_H_
 
 #include <memory>
 #include <string>
@@ -59,6 +59,10 @@ class BrowserView : public gin::Wrappable<BrowserView>,
 
   int32_t ID() const { return id_; }
 
+  // disable copy
+  BrowserView(const BrowserView&) = delete;
+  BrowserView& operator=(const BrowserView&) = delete;
+
  protected:
   BrowserView(gin::Arguments* args, const gin_helper::Dictionary& options);
   ~BrowserView() override;
@@ -84,12 +88,10 @@ class BrowserView : public gin::Wrappable<BrowserView>,
   base::WeakPtr<NativeWindow> owner_window_;
 
   int32_t id_;
-
-  DISALLOW_COPY_AND_ASSIGN(BrowserView);
 };
 
 }  // namespace api
 
 }  // namespace electron
 
-#endif  // SHELL_BROWSER_API_ELECTRON_API_BROWSER_VIEW_H_
+#endif  // ELECTRON_SHELL_BROWSER_API_ELECTRON_API_BROWSER_VIEW_H_

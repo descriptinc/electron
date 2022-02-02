@@ -9,8 +9,10 @@
 
 #include "base/bind.h"
 #include "base/files/file_util.h"
+#include "base/ignore_result.h"
 #include "base/task/post_task.h"
 #include "base/task/thread_pool.h"
+#include "base/threading/thread_restrictions.h"
 #include "chrome/common/pref_names.h"
 #include "components/download/public/common/download_danger_type.h"
 #include "components/prefs/pref_service.h"
@@ -126,8 +128,7 @@ void ElectronDownloadManagerDelegate::OnDownloadPathGenerated(
       settings.default_path = default_path;
 
     auto* web_preferences = WebContentsPreferences::From(web_contents);
-    const bool offscreen =
-        !web_preferences || web_preferences->IsEnabled(options::kOffscreen);
+    const bool offscreen = !web_preferences || web_preferences->IsOffscreen();
     settings.force_detached = offscreen;
 
     v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();

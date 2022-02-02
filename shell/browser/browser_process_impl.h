@@ -7,14 +7,13 @@
 // will return NULL if the service is not available, so callers must check for
 // this condition.
 
-#ifndef SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_
-#define SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_
+#ifndef ELECTRON_SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_
+#define ELECTRON_SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_
 
 #include <memory>
 #include <string>
 
 #include "base/command_line.h"
-#include "base/macros.h"
 #include "chrome/browser/browser_process.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/value_map_pref_store.h"
@@ -36,9 +35,15 @@ class BrowserProcessImpl : public BrowserProcess {
   BrowserProcessImpl();
   ~BrowserProcessImpl() override;
 
+  // disable copy
+  BrowserProcessImpl(const BrowserProcessImpl&) = delete;
+  BrowserProcessImpl& operator=(const BrowserProcessImpl&) = delete;
+
   static void ApplyProxyModeFromCommandLine(ValueMapPrefStore* pref_store);
 
   BuildState* GetBuildState() override;
+  breadcrumbs::BreadcrumbPersistentStorageManager*
+  GetBreadcrumbPersistentStorageManager() override;
   void PostEarlyInitialization();
   void PreCreateThreads();
   void PostDestroyThreads() {}
@@ -62,7 +67,6 @@ class BrowserProcessImpl : public BrowserProcess {
   NotificationPlatformBridge* notification_platform_bridge() override;
   SystemNetworkContextManager* system_network_context_manager() override;
   network::NetworkQualityTracker* network_quality_tracker() override;
-  WatchDogThread* watchdog_thread() override;
   policy::ChromeBrowserPolicyConnector* browser_policy_connector() override;
   policy::PolicyService* policy_service() override;
   IconManager* icon_manager() override;
@@ -107,8 +111,6 @@ class BrowserProcessImpl : public BrowserProcess {
 #endif
   std::unique_ptr<PrefService> local_state_;
   std::string locale_;
-
-  DISALLOW_COPY_AND_ASSIGN(BrowserProcessImpl);
 };
 
-#endif  // SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_
+#endif  // ELECTRON_SHELL_BROWSER_BROWSER_PROCESS_IMPL_H_

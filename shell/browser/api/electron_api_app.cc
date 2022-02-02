@@ -17,6 +17,7 @@
 #include "base/files/file_util.h"
 #include "base/path_service.h"
 #include "base/system/sys_info.h"
+#include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/icon_manager.h"
 #include "chrome/common/chrome_features.h"
@@ -35,8 +36,10 @@
 #include "net/dns/public/util.h"
 #include "net/ssl/client_cert_identity.h"
 #include "net/ssl/ssl_cert_request_info.h"
+#include "net/ssl/ssl_private_key.h"
 #include "sandbox/policy/switches.h"
 #include "services/network/network_service.h"
+#include "shell/app/command_line_args.h"
 #include "shell/browser/api/electron_api_menu.h"
 #include "shell/browser/api/electron_api_session.h"
 #include "shell/browser/api/electron_api_web_contents.h"
@@ -50,6 +53,7 @@
 #include "shell/common/electron_command_line.h"
 #include "shell/common/electron_paths.h"
 #include "shell/common/gin_converters/base_converter.h"
+#include "shell/common/gin_converters/blink_converter.h"
 #include "shell/common/gin_converters/callback_converter.h"
 #include "shell/common/gin_converters/file_path_converter.h"
 #include "shell/common/gin_converters/gurl_converter.h"
@@ -61,6 +65,7 @@
 #include "shell/common/node_includes.h"
 #include "shell/common/options_switches.h"
 #include "shell/common/platform_util.h"
+#include "shell/common/v8_value_serializer.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 #include "ui/gfx/image/image.h"
 
@@ -472,7 +477,7 @@ int GetPathConstant(const std::string& name) {
 #if defined(OS_POSIX)
     return base::DIR_CACHE;
 #else
-    return base::DIR_APP_DATA;
+    return base::DIR_ROAMING_APP_DATA;
 #endif
   else if (name == "userCache")
     return DIR_USER_CACHE;
@@ -510,18 +515,23 @@ int GetPathConstant(const std::string& name) {
 
 bool NotificationCallbackWrapper(
     const base::RepeatingCallback<
-        void(const base::CommandLine::StringVector& command_line,
-             const base::FilePath& current_directory)>& callback,
-    const base::CommandLine::StringVector& cmd,
-    const base::FilePath& cwd) {
+        void(const base::CommandLine& command_line,
+             const base::FilePath& current_directory,
+             const std::vector<const uint8_t> additional_data)>& callback,
+    const base::CommandLine& cmd,
+    const base::FilePath& cwd,
+    const std::vector<const uint8_t> additional_data) {
   // Make sure the callback is called after app gets ready.
   if (Browser::Get()->is_ready()) {
-    callback.Run(cmd, cwd);
+    callback.Run(cmd, cwd, std::move(additional_data));
   } else {
     scoped_refptr<base::SingleThreadTaskRunner> task_runner(
         base::ThreadTaskRunnerHandle::Get());
-    task_runner->PostTask(
-        FROM_HERE, base::BindOnce(base::IgnoreResult(callback), cmd, cwd));
+
+    // Make a copy of the span so that the data isn't lost.
+    task_runner->PostTask(FROM_HERE,
+                          base::BindOnce(base::IgnoreResult(callback), cmd, cwd,
+                                         std::move(additional_data)));
   }
   // ProcessSingleton needs to know whether current process is quiting.
   return !Browser::Get()->is_shutting_down();
@@ -1069,9 +1079,15 @@ std::string App::GetLocaleCountryCode() {
   return region.size() == 2 ? region : std::string();
 }
 
-void App::OnSecondInstance(const base::CommandLine::StringVector& cmd,
-                           const base::FilePath& cwd) {
-  Emit("second-instance", cmd, cwd);
+void App::OnSecondInstance(const base::CommandLine& cmd,
+                           const base::FilePath& cwd,
+                           const std::vector<const uint8_t> additional_data) {
+  v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
+  v8::Locker locker(isolate);
+  v8::HandleScope handle_scope(isolate);
+  v8::Local<v8::Value> data_value =
+      DeserializeV8Value(isolate, std::move(additional_data));
+  Emit("second-instance", cmd.argv(), cwd, data_value);
 }
 
 bool App::HasSingleInstanceLock() const {
@@ -1080,17 +1096,30 @@ bool App::HasSingleInstanceLock() const {
   return false;
 }
 
-bool App::RequestSingleInstanceLock() {
+bool App::RequestSingleInstanceLock(gin::Arguments* args) {
   if (HasSingleInstanceLock())
     return true;
+
+  std::string program_name = electron::Browser::Get()->GetName();
 
   base::FilePath user_dir;
   base::PathService::Get(chrome::DIR_USER_DATA, &user_dir);
 
   auto cb = base::BindRepeating(&App::OnSecondInstance, base::Unretained(this));
 
+  blink::CloneableMessage additional_data_message;
+  args->GetNext(&additional_data_message);
+#if defined(OS_WIN)
+  bool app_is_sandboxed =
+      IsSandboxEnabled(base::CommandLine::ForCurrentProcess());
   process_singleton_ = std::make_unique<ProcessSingleton>(
-      user_dir, base::BindRepeating(NotificationCallbackWrapper, cb));
+      program_name, user_dir, additional_data_message.encoded_message,
+      app_is_sandboxed, base::BindRepeating(NotificationCallbackWrapper, cb));
+#else
+  process_singleton_ = std::make_unique<ProcessSingleton>(
+      user_dir, additional_data_message.encoded_message,
+      base::BindRepeating(NotificationCallbackWrapper, cb));
+#endif
 
   switch (process_singleton_->NotifyOtherProcessOrCreate()) {
     case ProcessSingleton::NotifyResult::LOCK_ERROR:
@@ -1120,7 +1149,7 @@ bool App::Relaunch(gin::Arguments* js_args) {
 
   gin_helper::Dictionary options;
   if (js_args->GetNext(&options)) {
-    if (options.Get("execPath", &exec_path) | options.Get("args", &args))
+    if (options.Get("execPath", &exec_path) || options.Get("args", &args))
       override_argv = true;
   }
 

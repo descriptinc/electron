@@ -313,6 +313,23 @@ action("electron_fuses") {
   args = rebase_path(outputs)
 }
 
+action("electron_generate_node_defines") {
+  script = "build/generate_node_defines.py"
+
+  inputs = [
+    "//third_party/electron_node/src/tracing/trace_event_common.h",
+    "//third_party/electron_node/src/tracing/trace_event.h",
+    "//third_party/electron_node/src/util.h",
+  ]
+
+  outputs = [
+    "$target_gen_dir/push_and_undef_node_defines.h",
+    "$target_gen_dir/pop_node_defines.h",
+  ]
+
+  args = [ rebase_path(target_gen_dir) ] + rebase_path(inputs)
+}
+
 source_set("electron_lib") {
   configs += [ "//v8:external_startup_data" ]
   configs += [ "//third_party/electron_node:node_internals" ]
@@ -324,6 +341,7 @@ source_set("electron_lib") {
 
   deps = [
     ":electron_fuses",
+    ":electron_generate_node_defines",
     ":electron_js2c",
     ":electron_version_header",
     ":resources",
@@ -335,6 +353,7 @@ source_set("electron_lib") {
     "//base/allocator:buildflags",
     "//chrome/app:command_ids",
     "//chrome/app/resources:platform_locale_settings",
+    "//components/autofill/core/common:features",
     "//components/certificate_transparency",
     "//components/language/core/browser",
     "//components/net_log",
@@ -401,7 +420,6 @@ source_set("electron_lib") {
   ]
 
   include_dirs = [
-    "chromium_src",
     ".",
     "$target_gen_dir",
 
@@ -520,23 +538,30 @@ source_set("electron_lib") {
       "//build/config/linux/gtk",
       "//dbus",
       "//device/bluetooth",
+      "//ui/base/ime/linux",
       "//ui/events/devices/x11",
       "//ui/events/platform/x11",
       "//ui/gtk",
       "//ui/views/controls/webview",
       "//ui/wm",
     ]
-    if (use_x11) {
+    if (ozone_platform_x11) {
       sources += filenames.lib_sources_linux_x11
+      public_deps += [
+        "//ui/base/x",
+        "//ui/platform_window/x11",
+      ]
     }
     configs += [ ":gio_unix" ]
     defines += [
       # Disable warnings for g_settings_list_schemas.
       "GLIB_DISABLE_DEPRECATION_WARNINGS",
+      "USE_X11=1",
     ]
 
-    sources += filenames.lib_sources_nss
     sources += [
+      "shell/browser/certificate_manager_model.cc",
+      "shell/browser/certificate_manager_model.h",
       "shell/browser/ui/gtk/app_indicator_icon.cc",
       "shell/browser/ui/gtk/app_indicator_icon.h",
       "shell/browser/ui/gtk/app_indicator_icon_menu.cc",
@@ -608,12 +633,6 @@ source_set("electron_lib") {
   }
 
   if (enable_desktop_capturer) {
-    if (is_component_build && !is_linux) {
-      # On windows the implementation relies on unexported
-      # DxgiDuplicatorController class.  On macOS the implementation
-      # relies on unexported webrtc::GetWindowOwnerPid method.
-      deps += [ "//third_party/webrtc/modules/desktop_capture" ]
-    }
     sources += [
       "shell/browser/api/electron_api_desktop_capturer.cc",
       "shell/browser/api/electron_api_desktop_capturer.h",
@@ -881,8 +900,12 @@ if (is_mac) {
         deps += [ "//sandbox/mac:seatbelt" ]
       }
       defines = [ "HELPER_EXECUTABLE" ]
-      sources = filenames.app_sources
-      sources += [ "shell/common/electron_constants.cc" ]
+      sources = [
+        "shell/app/electron_main_mac.cc",
+        "shell/app/uv_stdio_fix.cc",
+        "shell/app/uv_stdio_fix.h",
+        "shell/common/electron_constants.cc",
+      ]
       include_dirs = [ "." ]
       info_plist = "shell/renderer/resources/mac/Info.plist"
       extra_substitutions =
@@ -1021,15 +1044,18 @@ if (is_mac) {
 
   mac_app_bundle("electron_app") {
     output_name = electron_product_name
-    sources = filenames.app_sources
-    sources += [ "shell/common/electron_constants.cc" ]
+    sources = [
+      "shell/app/electron_main_mac.cc",
+      "shell/app/uv_stdio_fix.cc",
+      "shell/app/uv_stdio_fix.h",
+      "shell/common/electron_constants.cc",
+    ]
     include_dirs = [ "." ]
     deps = [
       ":electron_app_framework_bundle_data",
       ":electron_app_plist",
       ":electron_app_resources",
       ":electron_fuses",
-      "//base",
       "//electron/buildflags",
     ]
     if (is_mas_build) {
@@ -1131,7 +1157,15 @@ if (is_mac) {
 
   executable("electron_app") {
     output_name = electron_project_name
-    sources = filenames.app_sources
+    if (is_win) {
+      sources = [ "shell/app/electron_main_win.cc" ]
+    } else if (is_linux) {
+      sources = [
+        "shell/app/electron_main_linux.cc",
+        "shell/app/uv_stdio_fix.cc",
+        "shell/app/uv_stdio_fix.h",
+      ]
+    }
     include_dirs = [ "." ]
     deps = [
       ":default_app_asar",

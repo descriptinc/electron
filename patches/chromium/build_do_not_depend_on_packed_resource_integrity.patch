@@ -11,10 +11,10 @@ if we ever align our .pak file generation with Chrome we can remove this
 patch.
 
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
-index d4436b93723cac8b33a6ffab1437b221446a1fb0..3aef47b5f85c11845962e48efd75a1d5064b7412 100644
+index 3f9990b36dcd0a1e8956dc3f390ed289b6166024..829fb27d568c4e556182523fa5cd9e69f1458916 100644
 --- a/chrome/BUILD.gn
 +++ b/chrome/BUILD.gn
-@@ -165,11 +165,16 @@ if (!is_android && !is_mac) {
+@@ -171,11 +171,16 @@ if (!is_android && !is_mac) {
          "common/crash_keys.h",
        ]
  
@@ -33,10 +33,10 @@ index d4436b93723cac8b33a6ffab1437b221446a1fb0..3aef47b5f85c11845962e48efd75a1d5
          "//base",
          "//build:branding_buildflags",
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index 135ad9b24745f6d016806f3c95993efe65b370f3..c5e694cd56b9db940e8564c82e2773aa1a53d9dd 100644
+index 0982cfa1db7233153af8b2ab7cd1c18dfb4dea49..b0f575de4c9dc6e23da5822a1591d78478aeece8 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -4359,7 +4359,7 @@ static_library("browser") {
+@@ -4522,7 +4522,7 @@ static_library("browser") {
  
      # On Windows, the hashes are embedded in //chrome:chrome_initial rather
      # than here in :chrome_dll.
@@ -46,45 +46,45 @@ index 135ad9b24745f6d016806f3c95993efe65b370f3..c5e694cd56b9db940e8564c82e2773aa
      }
  
 diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
-index 1004666505dc8c127bb2405571eba9ab60277e3f..700cc0d1f88d7873c1b29bc96e871983cc982403 100644
+index cf07780786f235b567b754f4f91a4d716bd86778..a575ed30de3991c1c5189a0aad9f63aee9f93374 100644
 --- a/chrome/test/BUILD.gn
 +++ b/chrome/test/BUILD.gn
-@@ -5329,7 +5329,6 @@ test("unit_tests") {
-     assert(toolkit_views)
-     sources += [ "../browser/ui/startup/credential_provider_signin_info_fetcher_win_unittest.cc" ]
-     deps += [
--      "//chrome:packed_resources_integrity",
-       "//chrome/browser:chrome_process_finder",
-       "//chrome/browser/safe_browsing/chrome_cleaner",
-       "//chrome/browser/safe_browsing/chrome_cleaner:public",
-@@ -5342,6 +5341,12 @@ test("unit_tests") {
-       "//components/chrome_cleaner/public/proto",
-       "//ui/events/devices:test_support",
-     ]
-+
-+    if (!is_electron_build) {
-+      deps += [
-+        "//chrome:packed_resources_integrity",
-+      ]
-+    }
-   }
+@@ -5529,7 +5529,6 @@ test("unit_tests") {
  
-   # TODO(crbug.com/931218): Ninja cannot handle certain characters appearing
-@@ -5934,7 +5939,6 @@ test("unit_tests") {
+     deps += [
+       "//chrome:other_version",
+-      "//chrome:packed_resources_integrity",
+       "//chrome//services/util_win:unit_tests",
+       "//chrome/app:chrome_dll_resources",
+       "//chrome/browser:chrome_process_finder",
+@@ -5552,6 +5551,10 @@ test("unit_tests") {
+       "//ui/resources",
+     ]
+ 
++    if (!is_electron_build) {
++      deps += [ "//chrome:packed_resources_integrity" ]
++    }
++
+     ldflags = [
+       "/DELAYLOAD:api-ms-win-core-winrt-error-l1-1-0.dll",
+       "/DELAYLOAD:api-ms-win-core-winrt-l1-1-0.dll",
+@@ -6243,7 +6246,6 @@ test("unit_tests") {
      }
  
      deps += [
 -      "//chrome:packed_resources_integrity_hash",
        "//chrome/browser:cart_db_content_proto",
+       "//chrome/browser:coupon_db_content_proto",
        "//chrome/browser/media/router:test_support",
-       "//chrome/browser/promo_browser_command:mojo_bindings",
-@@ -5970,6 +5974,9 @@ test("unit_tests") {
-       "//ui/color:test_support",
+@@ -6284,6 +6286,11 @@ test("unit_tests") {
        "//ui/native_theme:test_support",
+       "//ui/webui/resources/js/browser_command:mojo_bindings",
      ]
++
 +    if (!is_electron_build) {
 +      deps += [ "//chrome:packed_resources_integrity_hash" ]
 +    }
-     if (is_win) {
-       deps += [ "//components/chrome_cleaner/public/proto:test_only_proto" ]
-     }
++
+     if (is_chromeos_ash) {
+       deps += [
+         "//ash/assistant/model",
