@@ -5,7 +5,7 @@ Subject: [PATCH 1/8] Re-land "macos: use posix_spawn instead of fork"
 
 This reverts commit 217fdf4265589889d00c7c0622fde2710971a020.
 ---
- src/unix/process.c | 540 ++++++++++++++++++++++++++++++++++++++++++---
+ deps/uv/src/unix/process.c | 540 ++++++++++++++++++++++++++++++++++++++++++---
  1 file changed, 513 insertions(+), 27 deletions(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -606,7 +606,7 @@ Subject: [PATCH 2/8] spawn: remove error fast-cleanup code that triggers a
 
 Refs: https://github.com/libuv/libuv/pull/3107#issuecomment-782482608
 ---
- src/unix/process.c | 58 ++++++++++++++++++++++------------------------
+ deps/uv/src/unix/process.c | 58 ++++++++++++++++++++++------------------------
  1 file changed, 28 insertions(+), 30 deletions(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -697,7 +697,7 @@ Subject: [PATCH 3/8] darwin: protect posix_spawn from EINTR
 
 This is not a documented valid error, but seems to have been observed.
 ---
- src/unix/process.c | 13 ++++++++++---
+ deps/uv/src/unix/process.c | 13 ++++++++++---
  1 file changed, 10 insertions(+), 3 deletions(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -744,7 +744,7 @@ setuid(geteuid()) for the child.
 
 Refs: https://github.com/libuv/libuv/pull/3107#issuecomment-782482608
 ---
- src/unix/process.c | 59 +++++-----------------------------------------
+ deps/uv/src/unix/process.c | 59 +++++-----------------------------------------
  1 file changed, 6 insertions(+), 53 deletions(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -840,7 +840,7 @@ Subject: [PATCH 5/8] darwin,spawn: improve posix_spawn path search
 
 Ports the improvements in musl back to this function
 ---
- src/unix/process.c | 19 +++++++++++++++----
+ deps/uv/src/unix/process.c | 19 +++++++++++++++----
  1 file changed, 15 insertions(+), 4 deletions(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -897,10 +897,10 @@ index 8ddcab8869..7eb504e0ba 100644
 From 90678e9c4dd0b9e90e5285eff5f33392684e8ab0 Mon Sep 17 00:00:00 2001
 From: Jameson Nash <vtjnash@gmail.com>
 Date: Tue, 27 Jul 2021 11:33:56 -0400
-Subject: [PATCH 6/8] Update src/unix/process.c
+Subject: [PATCH 6/8] Update deps/uv/src/unix/process.c
 
 ---
- src/unix/process.c | 2 +-
+ deps/uv/src/unix/process.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -920,10 +920,10 @@ index 7eb504e0ba..7345bd3ce5 100644
 From e84c7f039bde595d5ddedbc07e61ca2a8aca36ab Mon Sep 17 00:00:00 2001
 From: Jameson Nash <vtjnash@gmail.com>
 Date: Tue, 27 Jul 2021 12:19:12 -0400
-Subject: [PATCH 7/8] Update src/unix/process.c
+Subject: [PATCH 7/8] Update deps/uv/src/unix/process.c
 
 ---
- src/unix/process.c | 1 +
+ deps/uv/src/unix/process.c | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
@@ -947,7 +947,7 @@ Subject: [PATCH 8/8] fix some additional problems and formatting issues
 We previously might fail to start a watcher, in rare failure cases, resulting in a zombie that we would fail to kill.
 Also avoid creating the signal-pipe unless required (addresses a review comment from Apple)
 ---
- src/unix/process.c | 238 ++++++++++++++++++++++++---------------------
+ deps/uv/src/unix/process.c | 238 ++++++++++++++++++++++++---------------------
  1 file changed, 125 insertions(+), 113 deletions(-)
 
 diff --git a/deps/uv/src/unix/process.c b/deps/uv/src/unix/process.c
