@@ -6,6 +6,7 @@
 #define ELECTRON_SHELL_BROWSER_NET_ELECTRON_URL_LOADER_FACTORY_H_
 
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,7 +22,6 @@
 #include "services/network/public/mojom/url_loader_factory.mojom.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
 #include "shell/common/gin_helper/dictionary.h"
-#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace electron {
 
@@ -73,7 +73,7 @@ class ElectronURLLoaderFactory : public network::SelfDeletingURLLoaderFactory {
         const std::vector<std::string>& removed_headers,
         const net::HttpRequestHeaders& modified_headers,
         const net::HttpRequestHeaders& modified_cors_exempt_headers,
-        const absl::optional<GURL>& new_url) override;
+        const std::optional<GURL>& new_url) override;
     void SetPriority(net::RequestPriority priority,
                      int32_t intra_priority_value) override {}
     void PauseReadingBodyFromNet() override {}
@@ -135,33 +135,27 @@ class ElectronURLLoaderFactory : public network::SelfDeletingURLLoaderFactory {
       mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       int32_t request_id,
       const network::URLLoaderCompletionStatus& status);
+
   static void StartLoadingBuffer(
       mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       network::mojom::URLResponseHeadPtr head,
-      const gin_helper::Dictionary& dict);
-  static void StartLoadingString(
-      mojo::PendingRemote<network::mojom::URLLoaderClient> client,
-      network::mojom::URLResponseHeadPtr head,
-      const gin_helper::Dictionary& dict,
-      v8::Isolate* isolate,
-      v8::Local<v8::Value> response);
+      v8::Local<v8::ArrayBufferView> buffer);
   static void StartLoadingFile(
-      mojo::PendingReceiver<network::mojom::URLLoader> loader,
-      network::ResourceRequest request,
       mojo::PendingRemote<network::mojom::URLLoaderClient> client,
+      mojo::PendingReceiver<network::mojom::URLLoader> loader,
       network::mojom::URLResponseHeadPtr head,
-      const gin_helper::Dictionary& dict,
-      v8::Isolate* isolate,
-      v8::Local<v8::Value> response);
+      const network::ResourceRequest& original_request,
+      const base::FilePath& path,
+      const gin_helper::Dictionary& opts);
   static void StartLoadingHttp(
+      mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       mojo::PendingReceiver<network::mojom::URLLoader> loader,
       const network::ResourceRequest& original_request,
-      mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
       const gin_helper::Dictionary& dict);
   static void StartLoadingStream(
-      mojo::PendingReceiver<network::mojom::URLLoader> loader,
       mojo::PendingRemote<network::mojom::URLLoaderClient> client,
+      mojo::PendingReceiver<network::mojom::URLLoader> loader,
       network::mojom::URLResponseHeadPtr head,
       const gin_helper::Dictionary& dict);
 

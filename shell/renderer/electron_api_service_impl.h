@@ -32,10 +32,10 @@ class ElectronApiServiceImpl : public mojom::ElectronRenderer,
 
   void BindTo(mojo::PendingReceiver<mojom::ElectronRenderer> receiver);
 
+  // mojom::ElectronRenderer
   void Message(bool internal,
                const std::string& channel,
-               blink::CloneableMessage arguments,
-               int32_t sender_id) override;
+               blink::CloneableMessage arguments) override;
   void ReceivePostMessage(const std::string& channel,
                           blink::TransferableMessage message) override;
   void TakeHeapSnapshot(mojo::ScopedHandle file,
@@ -51,7 +51,7 @@ class ElectronApiServiceImpl : public mojom::ElectronRenderer,
       mojo::ScopedMessagePipeHandle* interface_pipe) override;
 
  private:
-  // RenderFrameObserver implementation.
+  // content::RenderFrameObserver
   void DidCreateDocumentElement() override;
   void OnDestruct() override;
 
@@ -64,7 +64,7 @@ class ElectronApiServiceImpl : public mojom::ElectronRenderer,
   mojo::PendingReceiver<mojom::ElectronRenderer> pending_receiver_;
   mojo::Receiver<mojom::ElectronRenderer> receiver_{this};
 
-  RendererClientBase* renderer_client_;
+  raw_ptr<RendererClientBase> renderer_client_;
   base::WeakPtrFactory<ElectronApiServiceImpl> weak_factory_{this};
 };
 

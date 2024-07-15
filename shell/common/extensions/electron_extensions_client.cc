@@ -7,8 +7,8 @@
 #include <memory>
 #include <string>
 
-#include "base/lazy_instance.h"
 #include "base/logging.h"
+#include "base/no_destructor.h"
 #include "components/version_info/version_info.h"
 #include "content/public/common/user_agent.h"
 #include "extensions/common/core_extensions_api_provider.h"
@@ -60,13 +60,11 @@ class ElectronPermissionMessageProvider
   }
 };
 
-base::LazyInstance<ElectronPermissionMessageProvider>::DestructorAtExit
-    g_permission_message_provider = LAZY_INSTANCE_INITIALIZER;
-
 }  // namespace
 
 ElectronExtensionsClient::ElectronExtensionsClient()
     : webstore_base_url_(extension_urls::kChromeWebstoreBaseURL),
+      new_webstore_base_url_(extension_urls::kNewChromeWebstoreBaseURL),
       webstore_update_url_(extension_urls::kChromeWebstoreUpdateURL) {
   AddAPIProvider(std::make_unique<extensions::CoreExtensionsAPIProvider>());
   AddAPIProvider(std::make_unique<ElectronExtensionsAPIProvider>());
@@ -84,7 +82,9 @@ void ElectronExtensionsClient::InitializeWebStoreUrls(
 const extensions::PermissionMessageProvider&
 ElectronExtensionsClient::GetPermissionMessageProvider() const {
   NOTIMPLEMENTED();
-  return g_permission_message_provider.Get();
+
+  static base::NoDestructor<ElectronPermissionMessageProvider> instance;
+  return *instance;
 }
 
 const std::string ElectronExtensionsClient::GetProductName() {
@@ -125,6 +125,10 @@ bool ElectronExtensionsClient::IsScriptableURL(const GURL& url,
 
 const GURL& ElectronExtensionsClient::GetWebstoreBaseURL() const {
   return webstore_base_url_;
+}
+
+const GURL& ElectronExtensionsClient::GetNewWebstoreBaseURL() const {
+  return new_webstore_base_url_;
 }
 
 const GURL& ElectronExtensionsClient::GetWebstoreUpdateURL() const {

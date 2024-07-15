@@ -2,9 +2,9 @@
 // Use of this source code is governed by the MIT license that can be
 // found in the LICENSE file.
 
+#include <iterator>
 #include <utility>
 
-#include "base/hash/hash.h"
 #include "base/run_loop.h"
 #include "electron/buildflags/buildflags.h"
 #include "shell/common/api/electron_api_key_weak_map.h"
@@ -15,18 +15,6 @@
 #include "shell/common/node_includes.h"
 #include "url/origin.h"
 #include "v8/include/v8-profiler.h"
-
-namespace std {
-
-// The hash function used by DoubleIDWeakMap.
-template <typename Type1, typename Type2>
-struct hash<std::pair<Type1, Type2>> {
-  std::size_t operator()(std::pair<Type1, Type2> value) const {
-    return base::HashInts(base::Hash(value.first), value.second);
-  }
-};
-
-}  // namespace std
 
 namespace gin {
 
@@ -106,9 +94,11 @@ void RequestGarbageCollectionForTesting(v8::Isolate* isolate) {
 // This causes a fatal error by creating a circular extension dependency.
 void TriggerFatalErrorForTesting(v8::Isolate* isolate) {
   static const char* aDeps[] = {"B"};
-  v8::RegisterExtension(std::make_unique<v8::Extension>("A", "", 1, aDeps));
+  v8::RegisterExtension(
+      std::make_unique<v8::Extension>("A", "", std::size(aDeps), aDeps));
   static const char* bDeps[] = {"A"};
-  v8::RegisterExtension(std::make_unique<v8::Extension>("B", "", 1, bDeps));
+  v8::RegisterExtension(
+      std::make_unique<v8::Extension>("B", "", std::size(aDeps), bDeps));
   v8::ExtensionConfiguration config(1, bDeps);
   v8::Context::New(isolate, &config);
 }
@@ -135,4 +125,4 @@ void Initialize(v8::Local<v8::Object> exports,
 
 }  // namespace
 
-NODE_LINKED_MODULE_CONTEXT_AWARE(electron_common_v8_util, Initialize)
+NODE_LINKED_BINDING_CONTEXT_AWARE(electron_common_v8_util, Initialize)

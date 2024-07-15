@@ -16,6 +16,12 @@
 #include "media/base/media_switches.h"
 #include "net/base/features.h"
 #include "services/network/public/cpp/features.h"
+#include "third_party/blink/public/common/features.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "content/common/features.h"  // nogncheck
+#include "device/base/features.h"     // nogncheck
+#endif
 
 namespace electron {
 
@@ -32,17 +38,27 @@ void InitializeFeatureList() {
   disable_features +=
       std::string(",") + features::kSpareRendererForSitePerProcess.name;
 
-#if !BUILDFLAG(ENABLE_PICTURE_IN_PICTURE)
-  disable_features += std::string(",") + media::kPictureInPicture.name;
+#if BUILDFLAG(IS_WIN)
+  disable_features +=
+      // Disable async spellchecker suggestions for Windows, which causes
+      // an empty suggestions list to be returned
+      std::string(",") + spellcheck::kWinRetrieveSuggestionsOnlyOnDemand.name +
+      // Delayed spellcheck initialization is causing the
+      // 'custom dictionary word list API' spec to crash.
+      std::string(",") + spellcheck::kWinDelaySpellcheckServiceInit.name;
 #endif
 
-#if BUILDFLAG(IS_WIN)
-  // Disable async spellchecker suggestions for Windows, which causes
-  // an empty suggestions list to be returned
+#if BUILDFLAG(IS_MAC)
+  // Disable window occlusion checker.
   disable_features +=
-      std::string(",") + spellcheck::kWinRetrieveSuggestionsOnlyOnDemand.name;
+      std::string(",") + features::kMacWebContentsOcclusion.name;
 #endif
-  base::FeatureList::InitializeInstance(enable_features, disable_features);
+  std::string platform_specific_enable_features =
+      EnablePlatformSpecificFeatures();
+  if (platform_specific_enable_features.size() > 0) {
+    enable_features += std::string(",") + platform_specific_enable_features;
+  }
+  base::FeatureList::InitInstance(enable_features, disable_features);
 }
 
 void InitializeFieldTrials() {
@@ -52,5 +68,11 @@ void InitializeFieldTrials() {
 
   base::FieldTrialList::CreateTrialsFromString(force_fieldtrials);
 }
+
+#if !BUILDFLAG(IS_MAC)
+std::string EnablePlatformSpecificFeatures() {
+  return "";
+}
+#endif
 
 }  // namespace electron

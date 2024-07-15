@@ -7,21 +7,17 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "content/public/renderer/content_renderer_client.h"
 #include "electron/buildflags/buildflags.h"
+#include "media/base/key_systems_support_registration.h"
 #include "printing/buildflags/buildflags.h"
 #include "shell/common/gin_helper/dictionary.h"
 // In SHARED_INTERMEDIATE_DIR.
 #include "widevine_cdm_version.h"  // NOLINT(build/include_directory)
 
-#if defined(WIDEVINE_CDM_AVAILABLE)
-#include "chrome/renderer/media/chrome_key_systems_provider.h"  // nogncheck
-#endif
-
 #if BUILDFLAG(ENABLE_PDF_VIEWER)
-#include "chrome/renderer/pepper/chrome_pdf_print_client.h"  // nogncheck
+#include "components/pdf/renderer/internal_plugin_renderer_helpers.h"
 #endif  // BUILDFLAG(ENABLE_PDF_VIEWER)
 
 #if BUILDFLAG(ENABLE_BUILTIN_SPELLCHECKER)
@@ -97,6 +93,9 @@ class RendererClientBase : public content::ContentRendererClient
                    gin_helper::Dictionary* process,
                    content::RenderFrame* render_frame);
 
+  bool ShouldLoadPreload(v8::Handle<v8::Context> context,
+                         content::RenderFrame* render_frame) const;
+
   // content::ContentRendererClient:
   void RenderThreadStarted() override;
   void ExposeInterfacesToBrowser(mojo::BinderMap* binders) override;
@@ -104,14 +103,14 @@ class RendererClientBase : public content::ContentRendererClient
   bool OverrideCreatePlugin(content::RenderFrame* render_frame,
                             const blink::WebPluginParams& params,
                             blink::WebPlugin** plugin) override;
-  void GetSupportedKeySystems(media::GetSupportedKeySystemsCB cb) override;
-  bool IsKeySystemsUpdateNeeded() override;
   void DidSetUserAgent(const std::string& user_agent) override;
   bool IsPluginHandledExternally(content::RenderFrame* render_frame,
                                  const blink::WebElement& plugin_element,
                                  const GURL& original_url,
                                  const std::string& mime_type) override;
-  bool IsOriginIsolatedPepperPlugin(const base::FilePath& plugin_path) override;
+  v8::Local<v8::Object> GetScriptableObject(
+      const blink::WebElement& plugin_element,
+      v8::Isolate* isolate) override;
 
   void RunScriptsAtDocumentStart(content::RenderFrame* render_frame) override;
   void RunScriptsAtDocumentEnd(content::RenderFrame* render_frame) override;
@@ -138,6 +137,9 @@ class RendererClientBase : public content::ContentRendererClient
       int64_t service_worker_version_id,
       const GURL& service_worker_scope,
       const GURL& script_url) override;
+  void WebViewCreated(blink::WebView* web_view,
+                      bool was_created_by_renderer,
+                      const url::Origin* outermost_origin) override;
 
  protected:
 #if BUILDFLAG(ENABLE_ELECTRON_EXTENSIONS)
@@ -152,18 +154,12 @@ class RendererClientBase : public content::ContentRendererClient
   std::unique_ptr<ElectronExtensionsRendererClient> extensions_renderer_client_;
 #endif
 
-#if defined(WIDEVINE_CDM_AVAILABLE)
-  ChromeKeySystemsProvider key_systems_provider_;
-#endif
   std::string renderer_client_id_;
   // An increasing ID used for identifying an V8 context in this process.
   int64_t next_context_id_ = 0;
 
 #if BUILDFLAG(ENABLE_BUILTIN_SPELLCHECKER)
   std::unique_ptr<SpellCheck> spellcheck_;
-#endif
-#if BUILDFLAG(ENABLE_PDF_VIEWER)
-  std::unique_ptr<ChromePDFPrintClient> pdf_print_client_;
 #endif
 };
 

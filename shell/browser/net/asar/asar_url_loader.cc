@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "base/strings/stringprintf.h"
-#include "base/task/post_task.h"
 #include "base/task/thread_pool.h"
 #include "content/public/browser/file_url_loader.h"
 #include "electron/fuses.h"
@@ -63,7 +62,7 @@ class AsarURLLoader : public network::mojom::URLLoader {
  public:
   static void CreateAndStart(
       const network::ResourceRequest& request,
-      network::mojom::URLLoaderRequest loader,
+      mojo::PendingReceiver<network::mojom::URLLoader> loader,
       mojo::PendingRemote<network::mojom::URLLoaderClient> client,
       scoped_refptr<net::HttpResponseHeaders> extra_response_headers) {
     // Owns itself. Will live as long as its URLLoader and URLLoaderClientPtr
@@ -79,7 +78,7 @@ class AsarURLLoader : public network::mojom::URLLoader {
       const std::vector<std::string>& removed_headers,
       const net::HttpRequestHeaders& modified_headers,
       const net::HttpRequestHeaders& modified_cors_exempt_headers,
-      const absl::optional<GURL>& new_url) override {}
+      const std::optional<GURL>& new_url) override {}
   void SetPriority(net::RequestPriority priority,
                    int32_t intra_priority_value) override {}
   void PauseReadingBodyFromNet() override {}
@@ -167,8 +166,8 @@ class AsarURLLoader : public network::mojom::URLLoader {
       auto asar_validator = std::make_unique<AsarFileValidator>(
           std::move(info.integrity.value()), std::move(file));
       file_validator_raw = asar_validator.get();
-      readable_data_source.reset(new mojo::FilteredDataSource(
-          std::move(file_data_source), std::move(asar_validator)));
+      readable_data_source = std::make_unique<mojo::FilteredDataSource>(
+          std::move(file_data_source), std::move(asar_validator));
     } else {
       readable_data_source = std::move(file_data_source);
     }
@@ -222,14 +221,15 @@ class AsarURLLoader : public network::mojom::URLLoader {
       // Write any data we read for MIME sniffing, constraining by range where
       // applicable. This will always fit in the pipe (see assertion near
       // |kDefaultFileUrlPipeSize| definition).
-      uint32_t write_size = std::min(
-          static_cast<uint32_t>(read_result.bytes_read - first_byte_to_send),
-          static_cast<uint32_t>(total_bytes_to_send));
-      const uint32_t expected_write_size = write_size;
-      MojoResult result =
-          producer_handle->WriteData(&initial_read_buffer[first_byte_to_send],
-                                     &write_size, MOJO_WRITE_DATA_FLAG_NONE);
-      if (result != MOJO_RESULT_OK || write_size != expected_write_size) {
+      const size_t write_size = std::min(
+          (read_result.bytes_read - first_byte_to_send), total_bytes_to_send);
+      base::span<const uint8_t> bytes =
+          base::as_byte_span(initial_read_buffer)
+              .subspan(first_byte_to_send, write_size);
+      size_t bytes_written = 0;
+      MojoResult result = producer_handle->WriteData(
+          bytes, MOJO_WRITE_DATA_FLAG_NONE, bytes_written);
+      if (result != MOJO_RESULT_OK || write_size != bytes_written) {
         OnFileWritten(result);
         return;
       }
@@ -268,11 +268,10 @@ class AsarURLLoader : public network::mojom::URLLoader {
     }
     if (head->headers) {
       head->headers->AddHeader(net::HttpRequestHeaders::kContentType,
-                               head->mime_type.c_str());
+                               head->mime_type);
     }
-    client_->OnReceiveResponse(std::move(head),
-                               mojo::ScopedDataPipeConsumerHandle());
-    client_->OnStartLoadingResponseBody(std::move(consumer_handle));
+    client_->OnReceiveResponse(std::move(head), std::move(consumer_handle),
+                               std::nullopt);
 
     if (total_bytes_to_send == 0) {
       // There's definitely no more data, so we're already done.
@@ -390,7 +389,7 @@ class AsarURLLoader : public network::mojom::URLLoader {
 
 void CreateAsarURLLoader(
     const network::ResourceRequest& request,
-    network::mojom::URLLoaderRequest loader,
+    mojo::PendingReceiver<network::mojom::URLLoader> loader,
     mojo::PendingRemote<network::mojom::URLLoaderClient> client,
     scoped_refptr<net::HttpResponseHeaders> extra_response_headers) {
   auto task_runner = base::ThreadPool::CreateSequencedTaskRunner(

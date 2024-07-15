@@ -11,7 +11,7 @@ and electron/electron@d2368d2d3b3de9eec4cc32b6aaf035cc89921bf1 as
 patches.
 
 diff --git a/chrome/browser/extensions/global_shortcut_listener_ozone.cc b/chrome/browser/extensions/global_shortcut_listener_ozone.cc
-index ed2ac20679a9357c9493224ec5e08837c7860d6e..7f9a97e11395e5521e100694cd37bcd95bcd8e35 100644
+index 2ac08809148beeb6bacccfc5e9f032c3a88eabe7..025082e5fa644f89cec42fd8a2b97d6f764f375f 100644
 --- a/chrome/browser/extensions/global_shortcut_listener_ozone.cc
 +++ b/chrome/browser/extensions/global_shortcut_listener_ozone.cc
 @@ -58,7 +58,8 @@ bool GlobalShortcutListenerOzone::RegisterAcceleratorImpl(
@@ -52,10 +52,10 @@ index ed2ac20679a9357c9493224ec5e08837c7860d6e..7f9a97e11395e5521e100694cd37bcd9
    NotifyKeyPressed(ui::Accelerator(key_code, modifiers));
  }
 diff --git a/chrome/browser/extensions/global_shortcut_listener_ozone.h b/chrome/browser/extensions/global_shortcut_listener_ozone.h
-index eb3f3431a3774c3a05afd4c7350f3801e9c8c684..b8970ef9ddb69d6a9fc6d106293e760535b6f4b3 100644
+index 3c2fc1707e38345c114e140104ffc5a93d704918..40dac9fd7beb7a1a589a479a8035391d4a32cbb8 100644
 --- a/chrome/browser/extensions/global_shortcut_listener_ozone.h
 +++ b/chrome/browser/extensions/global_shortcut_listener_ozone.h
-@@ -45,7 +45,8 @@ class GlobalShortcutListenerOzone
+@@ -46,7 +46,8 @@ class GlobalShortcutListenerOzone
    void OnKeyPressed(ui::KeyboardCode key_code,
                      bool is_alt_down,
                      bool is_ctrl_down,
@@ -66,7 +66,7 @@ index eb3f3431a3774c3a05afd4c7350f3801e9c8c684..b8970ef9ddb69d6a9fc6d106293e7605
  
    bool is_listening_ = false;
 diff --git a/chrome/browser/extensions/global_shortcut_listener_win.cc b/chrome/browser/extensions/global_shortcut_listener_win.cc
-index 0f344ee352a48497e77a72bb298146c61e7fcf2a..3bad4263ea552fc63445bf5613f8add746a3a374 100644
+index 88bfc034f4bf8f54452ebea1aae88dc83feb148c..940fd488aad20f688d827186885490009d68690f 100644
 --- a/chrome/browser/extensions/global_shortcut_listener_win.cc
 +++ b/chrome/browser/extensions/global_shortcut_listener_win.cc
 @@ -62,6 +62,8 @@ void GlobalShortcutListenerWin::OnWndProc(HWND hwnd,
@@ -87,23 +87,35 @@ index 0f344ee352a48497e77a72bb298146c61e7fcf2a..3bad4263ea552fc63445bf5613f8add7
    // Create an observer that registers a hot key for |accelerator|.
    std::unique_ptr<gfx::SingletonHwndHotKeyObserver> observer =
 diff --git a/content/browser/media/media_keys_listener_manager_impl.cc b/content/browser/media/media_keys_listener_manager_impl.cc
-index 4e9e4f4d21fbe650d8f32254a3b450074a038751..ac923f436cbdd6ded0629da4e4c659d94258e55b 100644
+index 7fd996826e7968268df8184451ead9f5f0bfc23b..6f8d1243fe6b1c6dd83371ad4ff2e2d8ad6c865e 100644
 --- a/content/browser/media/media_keys_listener_manager_impl.cc
 +++ b/content/browser/media/media_keys_listener_manager_impl.cc
-@@ -296,6 +296,11 @@ void MediaKeysListenerManagerImpl::UpdateSystemMediaControlsEnabledControls() {
-       case ui::VKEY_MEDIA_STOP:
-         system_media_controls_->SetIsStopEnabled(should_enable);
-         break;
-+      case ui::VKEY_VOLUME_DOWN:
-+      case ui::VKEY_VOLUME_UP:
-+      case ui::VKEY_VOLUME_MUTE:
-+        // Do nothing.
-+        break;
-       default:
-         NOTREACHED();
-     }
+@@ -408,6 +408,11 @@ void MediaKeysListenerManagerImpl::UpdateSystemMediaControlsEnabledControls() {
+         case ui::VKEY_MEDIA_STOP:
+           browser_system_media_controls_->SetIsStopEnabled(should_enable);
+           break;
++        case ui::VKEY_VOLUME_DOWN:
++        case ui::VKEY_VOLUME_UP:
++        case ui::VKEY_VOLUME_MUTE:
++          // Do nothing.
++          break;
+         default:
+           NOTREACHED_IN_MIGRATION();
+       }
+@@ -450,6 +455,11 @@ void MediaKeysListenerManagerImpl::UpdateSystemMediaControlsEnabledControls() {
+         case ui::VKEY_MEDIA_STOP:
+           smc->SetIsStopEnabled(should_enable);
+           break;
++        case ui::VKEY_VOLUME_DOWN:
++        case ui::VKEY_VOLUME_UP:
++        case ui::VKEY_VOLUME_MUTE:
++          // Do nothing.
++          break;
+         default:
+           NOTREACHED_IN_MIGRATION();
+       }
 diff --git a/ui/base/accelerators/media_keys_listener.cc b/ui/base/accelerators/media_keys_listener.cc
-index 1145e1f3d79482b5bb468c3128431ac674310e5f..e9f595045e0c076e0735f27dfc38bfbc7951d372 100644
+index db596585cbb44b3710636e3fc013f288966f604f..6d5557ee1a2c35ee15e695e024834184a525e2a7 100644
 --- a/ui/base/accelerators/media_keys_listener.cc
 +++ b/ui/base/accelerators/media_keys_listener.cc
 @@ -13,7 +13,8 @@ MediaKeysListener::~MediaKeysListener() = default;
@@ -117,7 +129,7 @@ index 1145e1f3d79482b5bb468c3128431ac674310e5f..e9f595045e0c076e0735f27dfc38bfbc
  
  }  // namespace ui
 diff --git a/ui/base/accelerators/media_keys_listener_mac.mm b/ui/base/accelerators/media_keys_listener_mac.mm
-index ada705fb42e88d4bfa05b212c84111be9057a50e..a866b975687dd08ad88031a63f161b3164e82455 100644
+index a955d19eedfe56ae3a115ce4c77fea016fd66d49..ad2557495a02cae03dd2b87df8659a6f05f1beac 100644
 --- a/ui/base/accelerators/media_keys_listener_mac.mm
 +++ b/ui/base/accelerators/media_keys_listener_mac.mm
 @@ -32,6 +32,12 @@ KeyboardCode MediaKeyCodeToKeyboardCode(int key_code) {
@@ -133,7 +145,7 @@ index ada705fb42e88d4bfa05b212c84111be9057a50e..a866b975687dd08ad88031a63f161b31
    }
    return VKEY_UNKNOWN;
  }
-@@ -192,7 +198,10 @@ static CGEventRef EventTapCallback(CGEventTapProxy proxy,
+@@ -190,7 +196,10 @@ static CGEventRef EventTapCallback(CGEventTapProxy proxy,
    int key_code = (data1 & 0xFFFF0000) >> 16;
    if (key_code != NX_KEYTYPE_PLAY && key_code != NX_KEYTYPE_NEXT &&
        key_code != NX_KEYTYPE_PREVIOUS && key_code != NX_KEYTYPE_FAST &&
@@ -146,10 +158,10 @@ index ada705fb42e88d4bfa05b212c84111be9057a50e..a866b975687dd08ad88031a63f161b31
    }
  
 diff --git a/ui/base/x/x11_global_shortcut_listener.cc b/ui/base/x/x11_global_shortcut_listener.cc
-index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688ada1a3ad3 100644
+index 8b0bcbe458f44431385cedb89f988756d89636b6..bc10cf442edf14cd43714707565aae9475cb8112 100644
 --- a/ui/base/x/x11_global_shortcut_listener.cc
 +++ b/ui/base/x/x11_global_shortcut_listener.cc
-@@ -32,11 +32,13 @@ const x11::ModMask kModifiersMasks[] = {
+@@ -31,11 +31,13 @@ const x11::ModMask kModifiersMasks[] = {
  
  x11::ModMask GetNativeModifiers(bool is_alt_down,
                                  bool is_ctrl_down,
@@ -165,7 +177,7 @@ index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688a
  }
  
  }  // namespace
-@@ -82,8 +84,9 @@ uint32_t XGlobalShortcutListener::DispatchEvent(const PlatformEvent& event) {
+@@ -81,8 +83,9 @@ uint32_t XGlobalShortcutListener::DispatchEvent(const PlatformEvent& event) {
  bool XGlobalShortcutListener::RegisterAccelerator(KeyboardCode key_code,
                                                    bool is_alt_down,
                                                    bool is_ctrl_down,
@@ -177,7 +189,7 @@ index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688a
    auto keysym = XKeysymForWindowsKeyCode(key_code, false);
    auto keycode = connection_->KeysymToKeycode(keysym);
  
-@@ -108,7 +111,7 @@ bool XGlobalShortcutListener::RegisterAccelerator(KeyboardCode key_code,
+@@ -107,7 +110,7 @@ bool XGlobalShortcutListener::RegisterAccelerator(KeyboardCode key_code,
    }
  
    registered_combinations_.insert(
@@ -186,7 +198,7 @@ index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688a
  
    return true;
  }
-@@ -116,8 +119,9 @@ bool XGlobalShortcutListener::RegisterAccelerator(KeyboardCode key_code,
+@@ -115,8 +118,9 @@ bool XGlobalShortcutListener::RegisterAccelerator(KeyboardCode key_code,
  void XGlobalShortcutListener::UnregisterAccelerator(KeyboardCode key_code,
                                                      bool is_alt_down,
                                                      bool is_ctrl_down,
@@ -198,7 +210,7 @@ index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688a
    auto keysym = XKeysymForWindowsKeyCode(key_code, false);
    auto keycode = connection_->KeysymToKeycode(keysym);
  
-@@ -125,7 +129,7 @@ void XGlobalShortcutListener::UnregisterAccelerator(KeyboardCode key_code,
+@@ -124,7 +128,7 @@ void XGlobalShortcutListener::UnregisterAccelerator(KeyboardCode key_code,
      connection_->UngrabKey({keycode, x_root_window_, modifiers | mask});
  
    registered_combinations_.erase(
@@ -207,7 +219,7 @@ index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688a
  }
  
  void XGlobalShortcutListener::OnKeyPressEvent(const KeyEvent& event) {
-@@ -135,14 +139,15 @@ void XGlobalShortcutListener::OnKeyPressEvent(const KeyEvent& event) {
+@@ -134,14 +138,15 @@ void XGlobalShortcutListener::OnKeyPressEvent(const KeyEvent& event) {
    const bool is_alt_down = event.flags() & EF_ALT_DOWN;
    const bool is_ctrl_down = event.flags() & EF_CONTROL_DOWN;
    const bool is_shift_down = event.flags() & EF_SHIFT_DOWN;
@@ -226,10 +238,10 @@ index a772666160a71e8e31242e25a8f3383ad9b914bf..7ed78ff875ccf9c38a480d0d59f4688a
  
  }  // namespace ui
 diff --git a/ui/base/x/x11_global_shortcut_listener.h b/ui/base/x/x11_global_shortcut_listener.h
-index 9e472d76423a748cbf6257c6656d8fd69853dd93..404a294b9cf3dd6744ece0b5c1e611bbab207e78 100644
+index 7165e88ef78e0e1b4683a2ead588dc6529d085b8..a605cd8c1468be78172fed09eb227722b4832227 100644
 --- a/ui/base/x/x11_global_shortcut_listener.h
 +++ b/ui/base/x/x11_global_shortcut_listener.h
-@@ -40,18 +40,21 @@ class COMPONENT_EXPORT(UI_BASE_X) XGlobalShortcutListener
+@@ -41,18 +41,21 @@ class COMPONENT_EXPORT(UI_BASE_X) XGlobalShortcutListener
    virtual void OnKeyPressed(KeyboardCode key_code,
                              bool is_alt_down,
                              bool is_ctrl_down,
@@ -254,7 +266,7 @@ index 9e472d76423a748cbf6257c6656d8fd69853dd93..404a294b9cf3dd6744ece0b5c1e611bb
  
   private:
    // Due to how system key grabbing works on X11, we have to be a bit greedy and
-@@ -60,7 +63,7 @@ class COMPONENT_EXPORT(UI_BASE_X) XGlobalShortcutListener
+@@ -61,7 +64,7 @@ class COMPONENT_EXPORT(UI_BASE_X) XGlobalShortcutListener
    // and filter the incoming events against that registry before notifying the
    // observer.  This tuple describes the meaningful parts of the event; booleans
    // 1, 2, and 3 hold states of Alt, Control, and Shift keys, respectively.
@@ -264,7 +276,7 @@ index 9e472d76423a748cbf6257c6656d8fd69853dd93..404a294b9cf3dd6744ece0b5c1e611bb
    // Invoked when a global shortcut is pressed.
    void OnKeyPressEvent(const KeyEvent& event);
 diff --git a/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.cc b/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.cc
-index 760dfc340601b7c1807fa750b008bcc79780c583..54f9817017c9fc0ebcd2f5825fb20b2fb8412b02 100644
+index d23310746bca13981d0099ce74c62459471db0e5..6ad79156e62dc60bdf20ef1acf53ec2425cb2bfe 100644
 --- a/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.cc
 +++ b/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.cc
 @@ -26,27 +26,30 @@ void X11GlobalShortcutListenerOzone::StopListening() {
@@ -305,7 +317,7 @@ index 760dfc340601b7c1807fa750b008bcc79780c583..54f9817017c9fc0ebcd2f5825fb20b2f
  }
  
 diff --git a/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.h b/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.h
-index 0f1980abdcaf30e23f580b937ecb2c422bf2a357..112967622cb8a6263c7a88dd8d09f48f52448a45 100644
+index 4f7392e2019828caf374d7008068222aa366815f..bc1fcbb68c15d999caa991d678a6bb7473496d39 100644
 --- a/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.h
 +++ b/ui/ozone/platform/x11/x11_global_shortcut_listener_ozone.h
 @@ -28,17 +28,20 @@ class X11GlobalShortcutListenerOzone : public PlatformGlobalShortcutListener,
@@ -333,10 +345,10 @@ index 0f1980abdcaf30e23f580b937ecb2c422bf2a357..112967622cb8a6263c7a88dd8d09f48f
  
  }  // namespace ui
 diff --git a/ui/ozone/public/platform_global_shortcut_listener.h b/ui/ozone/public/platform_global_shortcut_listener.h
-index a5b539d4e7461c4ca9faa08fef086fc28a4ebd3a..f3aacc605f07807a5b83b496bd8a87933981d4f3 100644
+index dd8bf45d0b7072178d97678565c023c0a6f9a6db..c6af8dbe1dee2d9c1552383b17c81ae12b5cc05c 100644
 --- a/ui/ozone/public/platform_global_shortcut_listener.h
 +++ b/ui/ozone/public/platform_global_shortcut_listener.h
-@@ -19,7 +19,8 @@ class COMPONENT_EXPORT(OZONE_BASE) PlatformGlobalShortcutListenerDelegate {
+@@ -20,7 +20,8 @@ class COMPONENT_EXPORT(OZONE_BASE) PlatformGlobalShortcutListenerDelegate {
    virtual void OnKeyPressed(KeyboardCode key_code,
                              bool is_alt_down,
                              bool is_ctrl_down,
@@ -346,7 +358,7 @@ index a5b539d4e7461c4ca9faa08fef086fc28a4ebd3a..f3aacc605f07807a5b83b496bd8a8793
    // Called back when the platform implementation is destroyed.
    virtual void OnPlatformListenerDestroyed() = 0;
  
-@@ -51,11 +52,13 @@ class COMPONENT_EXPORT(OZONE_BASE) PlatformGlobalShortcutListener {
+@@ -52,11 +53,13 @@ class COMPONENT_EXPORT(OZONE_BASE) PlatformGlobalShortcutListener {
    virtual bool RegisterAccelerator(KeyboardCode key_code,
                                     bool is_alt_down,
                                     bool is_ctrl_down,

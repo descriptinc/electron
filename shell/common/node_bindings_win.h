@@ -13,9 +13,9 @@ namespace electron {
 class NodeBindingsWin : public NodeBindings {
  public:
   explicit NodeBindingsWin(BrowserEnvironment browser_env);
-  ~NodeBindingsWin() override;
 
  private:
+  // NodeBindings
   void PollEvents() override;
 };
 

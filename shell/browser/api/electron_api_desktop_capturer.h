@@ -15,13 +15,11 @@
 #include "gin/wrappable.h"
 #include "shell/common/gin_helper/pinnable.h"
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 class DesktopCapturer : public gin::Wrappable<DesktopCapturer>,
                         public gin_helper::Pinnable<DesktopCapturer>,
-                        public DesktopMediaListObserver {
+                        private DesktopMediaListObserver {
  public:
   struct Source {
     DesktopMediaList::Source media_list_source;
@@ -53,6 +51,7 @@ class DesktopCapturer : public gin::Wrappable<DesktopCapturer>,
   explicit DesktopCapturer(v8::Isolate* isolate);
   ~DesktopCapturer() override;
 
+ private:
   // DesktopMediaListObserver:
   void OnSourceAdded(int index) override {}
   void OnSourceRemoved(int index) override {}
@@ -60,10 +59,40 @@ class DesktopCapturer : public gin::Wrappable<DesktopCapturer>,
   void OnSourceNameChanged(int index) override {}
   void OnSourceThumbnailChanged(int index) override {}
   void OnSourcePreviewChanged(size_t index) override {}
+  void OnDelegatedSourceListSelection() override {}
+  void OnDelegatedSourceListDismissed() override {}
 
- private:
+  using OnceCallback = base::OnceClosure;
+
+  class DesktopListListener : public DesktopMediaListObserver {
+   public:
+    DesktopListListener(OnceCallback update_callback,
+                        OnceCallback failure_callback,
+                        bool skip_thumbnails);
+    ~DesktopListListener() override;
+
+   protected:
+    void OnSourceAdded(int index) override {}
+    void OnSourceRemoved(int index) override {}
+    void OnSourceMoved(int old_index, int new_index) override {}
+    void OnSourceNameChanged(int index) override {}
+    void OnSourceThumbnailChanged(int index) override;
+    void OnSourcePreviewChanged(size_t index) override {}
+    void OnDelegatedSourceListSelection() override;
+    void OnDelegatedSourceListDismissed() override;
+
+   private:
+    OnceCallback update_callback_;
+    OnceCallback failure_callback_;
+    bool have_selection_ = false;
+    bool have_thumbnail_ = false;
+  };
+
   void UpdateSourcesList(DesktopMediaList* list);
+  void HandleFailure();
 
+  std::unique_ptr<DesktopListListener> window_listener_;
+  std::unique_ptr<DesktopListListener> screen_listener_;
   std::unique_ptr<DesktopMediaList> window_capturer_;
   std::unique_ptr<DesktopMediaList> screen_capturer_;
   std::vector<DesktopCapturer::Source> captured_sources_;
@@ -77,8 +106,6 @@ class DesktopCapturer : public gin::Wrappable<DesktopCapturer>,
   base::WeakPtrFactory<DesktopCapturer> weak_ptr_factory_{this};
 };
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 #endif  // ELECTRON_SHELL_BROWSER_API_ELECTRON_API_DESKTOP_CAPTURER_H_

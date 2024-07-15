@@ -10,9 +10,7 @@
 #include "shell/common/gin_helper/object_template_builder.h"
 #include "shell/common/node_includes.h"
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 ImageView::ImageView() : View(new views::ImageView()) {
   view()->set_owned_by_client();
@@ -40,9 +38,7 @@ void ImageView::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("setImage", &ImageView::SetImage);
 }
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 namespace {
 
@@ -60,4 +56,4 @@ void Initialize(v8::Local<v8::Object> exports,
 
 }  // namespace
 
-NODE_LINKED_MODULE_CONTEXT_AWARE(electron_browser_image_view, Initialize)
+NODE_LINKED_BINDING_CONTEXT_AWARE(electron_browser_image_view, Initialize)

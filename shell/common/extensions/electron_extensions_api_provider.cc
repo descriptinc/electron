@@ -10,6 +10,7 @@
 #include "base/containers/span.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/common/extensions/chrome_manifest_url_handlers.h"
+#include "chrome/common/extensions/manifest_handlers/minimum_chrome_version_checker.h"
 #include "electron/buildflags/buildflags.h"
 #include "electron/shell/common/extensions/api/generated_schemas.h"
 #include "extensions/common/alias.h"
@@ -18,6 +19,7 @@
 #include "extensions/common/features/simple_feature.h"
 #include "extensions/common/manifest_constants.h"
 #include "extensions/common/manifest_handler.h"
+#include "extensions/common/manifest_handler_registry.h"
 #include "extensions/common/manifest_handlers/permissions_parser.h"
 #include "extensions/common/manifest_url_handlers.h"
 #include "extensions/common/permissions/permissions_info.h"
@@ -34,8 +36,14 @@ constexpr APIPermissionInfo::InitInfo permissions_to_register[] = {
          APIPermissionInfo::kFlagInternal},
     {mojom::APIPermissionID::kResourcesPrivate, "resourcesPrivate",
      APIPermissionInfo::kFlagCannotBeOptional},
+#if BUILDFLAG(ENABLE_PDF_VIEWER)
+    {mojom::APIPermissionID::kPdfViewerPrivate, "pdfViewerPrivate"},
+#endif
     {mojom::APIPermissionID::kManagement, "management"},
-    {mojom::APIPermissionID::kCryptotokenPrivate, "cryptotokenPrivate"},
+    {mojom::APIPermissionID::kTab, "tabs",
+     APIPermissionInfo::kFlagRequiresManagementUIWarning},
+    {mojom::APIPermissionID::kScripting, "scripting",
+     APIPermissionInfo::kFlagRequiresManagementUIWarning},
 };
 base::span<const APIPermissionInfo::InitInfo> GetPermissionInfos() {
   return base::make_span(permissions_to_register);
@@ -81,7 +89,7 @@ bool ElectronExtensionsAPIProvider::IsAPISchemaGenerated(
   return extensions::api::ElectronGeneratedSchemas::IsGenerated(name);
 }
 
-base::StringPiece ElectronExtensionsAPIProvider::GetAPISchema(
+std::string_view ElectronExtensionsAPIProvider::GetAPISchema(
     const std::string& name) {
   return extensions::api::ElectronGeneratedSchemas::Get(name);
 }
@@ -97,6 +105,8 @@ void ElectronExtensionsAPIProvider::RegisterManifestHandlers() {
       extensions::ManifestHandlerRegistry::Get();
   registry->RegisterHandler(
       std::make_unique<extensions::DevToolsPageHandler>());
+  registry->RegisterHandler(
+      std::make_unique<extensions::MinimumChromeVersionChecker>());
 }
 
 }  // namespace electron

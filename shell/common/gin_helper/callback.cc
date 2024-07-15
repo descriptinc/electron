@@ -4,9 +4,9 @@
 
 #include "shell/common/gin_helper/callback.h"
 
-#include "base/cxx17_backports.h"
 #include "content/public/browser/browser_thread.h"
 #include "gin/dictionary.h"
+#include "shell/common/process_util.h"
 
 namespace gin_helper {
 
@@ -15,7 +15,7 @@ namespace {
 struct TranslaterHolder {
   explicit TranslaterHolder(v8::Isolate* isolate)
       : handle(isolate, v8::External::New(isolate, this)) {
-    handle.SetWeak(this, &GC, v8::WeakCallbackType::kFinalizer);
+    handle.SetWeak(this, &GC, v8::WeakCallbackType::kParameter);
   }
   ~TranslaterHolder() {
     if (!handle.IsEmpty()) {
@@ -70,7 +70,7 @@ void CallTranslater(v8::Local<v8::External> external,
 struct DeleteOnUIThread {
   template <typename T>
   static void Destruct(const T* x) {
-    if (gin_helper::Locker::IsBrowserProcess() &&
+    if (electron::IsBrowserProcess() &&
         !content::BrowserThread::CurrentlyOn(content::BrowserThread::UI)) {
       content::BrowserThread::DeleteSoon(content::BrowserThread::UI, FROM_HERE,
                                          x);
@@ -126,7 +126,7 @@ v8::Local<v8::Value> CreateFunctionFromTranslater(v8::Isolate* isolate,
       v8::Local<v8::FunctionTemplate>::New(isolate, g_call_translater);
   auto* holder = new TranslaterHolder(isolate);
   holder->translater = translater;
-  gin::Dictionary state = gin::Dictionary::CreateEmpty(isolate);
+  auto state = gin::Dictionary::CreateEmpty(isolate);
   if (one_time)
     state.Set("oneTime", true);
   auto context = isolate->GetCurrentContext();
@@ -147,7 +147,7 @@ v8::Local<v8::Value> BindFunctionWith(v8::Isolate* isolate,
   CHECK(!bind.IsEmpty());
   v8::Local<v8::Function> bind_func = bind.ToLocalChecked().As<v8::Function>();
   v8::Local<v8::Value> converted[] = {func, arg1, arg2};
-  return bind_func->Call(context, func, base::size(converted), converted)
+  return bind_func->Call(context, func, std::size(converted), converted)
       .ToLocalChecked();
 }
 

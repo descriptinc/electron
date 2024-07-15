@@ -1,4 +1,4 @@
-const cp = require('child_process');
+const cp = require('node:child_process');
 const utils = require('./lib/utils');
 const electronPath = utils.getAbsoluteElectronExec();
 
@@ -14,3 +14,4 @@ const handleTerminationSignal = (signal) =>
 
 handleTerminationSignal('SIGINT');
 handleTerminationSignal('SIGTERM');
+handleTerminationSignal('SIGUSR2');

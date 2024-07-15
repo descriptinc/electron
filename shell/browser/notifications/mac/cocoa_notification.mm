@@ -28,7 +28,7 @@ CocoaNotification::~CocoaNotification() {
 }
 
 void CocoaNotification::Show(const NotificationOptions& options) {
-  notification_.reset([[NSUserNotification alloc] init]);
+  notification_ = [[NSUserNotification alloc] init];
 
   NSString* identifier =
       [NSString stringWithFormat:@"%@:notification:%@",
@@ -45,8 +45,7 @@ void CocoaNotification::Show(const NotificationOptions& options) {
   }
 
   if (!options.icon.drawsNothing()) {
-    NSImage* image = skia::SkBitmapToNSImageWithColorSpace(
-        options.icon, base::mac::GetGenericRGBColorSpace());
+    NSImage* image = skia::SkBitmapToNSImage(options.icon);
     [notification_ setContentImage:image];
   }
 
@@ -58,17 +57,27 @@ void CocoaNotification::Show(const NotificationOptions& options) {
     [notification_ setSoundName:base::SysUTF16ToNSString(options.sound)];
   }
 
-  [notification_ setHasActionButton:false];
+  if (options.has_reply) {
+    [notification_ setHasReplyButton:true];
+    [notification_ setResponsePlaceholder:base::SysUTF16ToNSString(
+                                              options.reply_placeholder)];
+  }
+
+  // We need to explicitly set this to false if there are no
+  // actions, otherwise a Show button will appear by default.
+  if (options.actions.size() == 0)
+    [notification_ setHasActionButton:false];
 
   int i = 0;
   action_index_ = UINT_MAX;
-  NSMutableArray* additionalActions =
-      [[[NSMutableArray alloc] init] autorelease];
+  NSMutableArray* additionalActions = [[NSMutableArray alloc] init];
   for (const auto& action : options.actions) {
     if (action.type == u"button") {
-      if (action_index_ == UINT_MAX) {
+      // If the notification has both a reply and actions,
+      // the reply takes precedence and the actions all
+      // become additional actions.
+      if (!options.has_reply && action_index_ == UINT_MAX) {
         // First button observed is the displayed action
-        [notification_ setHasActionButton:true];
         [notification_
             setActionButtonTitle:base::SysUTF16ToNSString(action.text)];
         action_index_ = i;
@@ -86,14 +95,9 @@ void CocoaNotification::Show(const NotificationOptions& options) {
     }
     i++;
   }
+
   if ([additionalActions count] > 0) {
     [notification_ setAdditionalActions:additionalActions];
-  }
-
-  if (options.has_reply) {
-    [notification_ setResponsePlaceholder:base::SysUTF16ToNSString(
-                                              options.reply_placeholder)];
-    [notification_ setHasReplyButton:true];
   }
 
   if (!options.close_button_text.empty()) {
@@ -112,7 +116,7 @@ void CocoaNotification::Dismiss() {
 
   NotificationDismissed();
 
-  notification_.reset(nil);
+  notification_ = nil;
 }
 
 void CocoaNotification::NotificationDisplayed() {

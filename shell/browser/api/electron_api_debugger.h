@@ -7,7 +7,8 @@
 
 #include <map>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/values.h"
 #include "content/public/browser/devtools_agent_host_client.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -22,14 +23,12 @@ class DevToolsAgentHost;
 class WebContents;
 }  // namespace content
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 class Debugger : public gin::Wrappable<Debugger>,
                  public gin_helper::EventEmitterMixin<Debugger>,
                  public content::DevToolsAgentHostClient,
-                 public content::WebContentsObserver {
+                 private content::WebContentsObserver {
  public:
   static gin::Handle<Debugger> Create(v8::Isolate* isolate,
                                       content::WebContents* web_contents);
@@ -59,7 +58,7 @@ class Debugger : public gin::Wrappable<Debugger>,
 
  private:
   using PendingRequestMap =
-      std::map<int, gin_helper::Promise<base::DictionaryValue>>;
+      std::map<int, gin_helper::Promise<base::Value::Dict>>;
 
   void Attach(gin::Arguments* args);
   bool IsAttached();
@@ -67,15 +66,13 @@ class Debugger : public gin::Wrappable<Debugger>,
   v8::Local<v8::Promise> SendCommand(gin::Arguments* args);
   void ClearPendingRequests();
 
-  content::WebContents* web_contents_;  // Weak Reference.
+  raw_ptr<content::WebContents> web_contents_;  // Weak Reference.
   scoped_refptr<content::DevToolsAgentHost> agent_host_;
 
   PendingRequestMap pending_requests_;
   int previous_request_id_ = 0;
 };
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 #endif  // ELECTRON_SHELL_BROWSER_API_ELECTRON_API_DEBUGGER_H_

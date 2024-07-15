@@ -7,14 +7,14 @@ macOS, Windows, and Linux.
 
 ## Create frameless windows
 
-A frameless window is a window that has no [chrome]. Not to be confused with the Google
+A frameless window is a window that has no [chrome][]. Not to be confused with the Google
 Chrome browser, window _chrome_ refers to the parts of the window (e.g. toolbars, controls)
 that are not a part of the web page.
 
 To create a frameless window, you need to set `frame` to `false` in the `BrowserWindow`
 constructor.
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({ frame: false })
 ```
@@ -28,7 +28,7 @@ option in the `BrowserWindow` constructor.
 Applying the `hidden` title bar style results in a hidden title bar and a full-size
 content window.
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({ titleBarStyle: 'hidden' })
 ```
@@ -44,7 +44,7 @@ The `customButtonsOnHover` title bar style will hide the traffic lights until yo
 over them. This is useful if you want to create custom traffic lights in your HTML but still
 use the native UI to control the window.
 
-```javascript
+```js
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({ titleBarStyle: 'customButtonsOnHover' })
 ```
@@ -57,7 +57,7 @@ options available.
 Applying `hiddenInset` title bar style will shift the vertical inset of the traffic lights
 by a fixed amount.
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({ titleBarStyle: 'hiddenInset' })
 ```
@@ -66,7 +66,7 @@ If you need more granular control over the positioning of the traffic lights, yo
 a set of coordinates to the `trafficLightPosition` option in the `BrowserWindow`
 constructor.
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({
   titleBarStyle: 'hidden',
@@ -80,7 +80,7 @@ You can also show and hide the traffic lights programmatically from the main pro
 The `win.setWindowButtonVisibility` forces traffic lights to be show or hidden depending
 on the value of its boolean parameter.
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow()
 // hides the traffic lights
@@ -91,9 +91,9 @@ win.setWindowButtonVisibility(false)
 > combining `frame: false` with `win.setWindowButtonVisibility(true)` will yield the same
 > layout outcome as setting `titleBarStyle: 'hidden'`.
 
-## Window Controls Overlay _macOS_ _Windows_
+## Window Controls Overlay
 
-The [Window Controls Overlay API] is a web standard that gives web apps the ability to
+The [Window Controls Overlay API][] is a web standard that gives web apps the ability to
 customize their title bar region when installed on desktop. Electron exposes this API
 through the `BrowserWindow` constructor option `titleBarOverlay`.
 
@@ -106,7 +106,7 @@ The `titleBarOverlay` option accepts two different value formats.
 Specifying `true` on either platform will result in an overlay region with default
 system colors:
 
-```javascript title='main.js'
+```js title='main.js'
 // on macOS or Windows
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({
@@ -115,18 +115,18 @@ const win = new BrowserWindow({
 })
 ```
 
-On Windows, you can also specify the color of the overlay and its symbols by setting
-`titleBarOverlay` to an object with the `color` and `symbolColor` properties. If an option
-is not specified, the color will default to its system color for the window control buttons:
+On either platform `titleBarOverlay` can also be an object. The height of the overlay can be specified with the `height` property. On Windows and Linux, the color of the overlay and can be specified using the `color` property. On Windows and Linux, the color of the overlay and its symbols can be specified using the `color` and `symbolColor` properties respectively. The `rgba()`, `hsla()`, and `#RRGGBBAA` color formats are supported to apply transparency.
 
-```javascript title='main.js'
-// on Windows
+If a color option is not specified, the color will default to its system color for the window control buttons. Similarly, if the height option is not specified it will default to the default height:
+
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({
   titleBarStyle: 'hidden',
   titleBarOverlay: {
     color: '#2f3241',
-    symbolColor: '#74b1be'
+    symbolColor: '#74b1be',
+    height: 60
   }
 })
 ```
@@ -139,7 +139,7 @@ const win = new BrowserWindow({
 
 By setting the `transparent` option to `true`, you can make a fully transparent window.
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow({ transparent: true })
 ```
@@ -150,7 +150,7 @@ const win = new BrowserWindow({ transparent: true })
   [#1335](https://github.com/electron/electron/issues/1335) for details.
 * Transparent windows are not resizable. Setting `resizable` to `true` may make
   a transparent window stop working on some platforms.
-* The CSS [`blur()`] filter only applies to the window's web contents, so there is no way to apply
+* The CSS [`blur()`][] filter only applies to the window's web contents, so there is no way to apply
   blur effect to the content below the window (i.e. other applications open on
   the user's system).
 * The window will not be transparent when DevTools is opened.
@@ -168,7 +168,7 @@ To create a click-through window, i.e. making the window ignore all mouse
 events, you can call the [win.setIgnoreMouseEvents(ignore)][ignore-mouse-events]
 API:
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow } = require('electron')
 const win = new BrowserWindow()
 win.setIgnoreMouseEvents(true)
@@ -181,9 +181,9 @@ meaning that mouse movement events will not be emitted. On Windows and macOS, an
 optional parameter can be used to forward mouse move messages to the web page,
 allowing events such as `mouseleave` to be emitted:
 
-```javascript title='main.js'
+```js title='main.js'
 const { BrowserWindow, ipcMain } = require('electron')
-const path = require('path')
+const path = require('node:path')
 
 const win = new BrowserWindow({
   webPreferences: {
@@ -191,13 +191,13 @@ const win = new BrowserWindow({
   }
 })
 
-ipcMain.on('set-ignore-mouse-events', (event, ...args) => {
+ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  win.setIgnoreMouseEvents(...args)
+  win.setIgnoreMouseEvents(ignore, options)
 })
 ```
 
-```javascript title='preload.js'
+```js title='preload.js'
 window.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('clickThroughElement')
   el.addEventListener('mouseenter', () => {
@@ -263,7 +263,6 @@ behave correctly on all platforms, you should never use a custom context menu on
 draggable areas.
 
 [`blur()`]: https://developer.mozilla.org/en-US/docs/Web/CSS/filter-function/blur()
-[`BrowserWindow`]: ../api/browser-window.md
 [chrome]: https://developer.mozilla.org/en-US/docs/Glossary/Chrome
 [ignore-mouse-events]: ../api/browser-window.md#winsetignoremouseeventsignore-options
 [overlay-css-env-vars]: https://github.com/WICG/window-controls-overlay/blob/main/explainer.md#css-environment-variables

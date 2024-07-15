@@ -6,12 +6,28 @@
 
 #include <utility>
 
+#include "media/base/limits.h"
 #include "media/base/video_frame_metadata.h"
 #include "media/capture/mojom/video_capture_buffer.mojom.h"
 #include "media/capture/mojom/video_capture_types.mojom.h"
 #include "services/viz/privileged/mojom/compositing/frame_sink_video_capture.mojom-shared.h"
 #include "shell/browser/osr/osr_render_widget_host_view.h"
 #include "ui/gfx/skbitmap_operations.h"
+
+namespace {
+
+bool IsValidMinAndMaxFrameSize(gfx::Size min_frame_size,
+                               gfx::Size max_frame_size) {
+  // Returns true if
+  // 0 < |min_frame_size| <= |max_frame_size| <= media::limits::kMaxDimension.
+  return 0 < min_frame_size.width() && 0 < min_frame_size.height() &&
+         min_frame_size.width() <= max_frame_size.width() &&
+         min_frame_size.height() <= max_frame_size.height() &&
+         max_frame_size.width() <= media::limits::kMaxDimension &&
+         max_frame_size.height() <= media::limits::kMaxDimension;
+}
+
+}  // namespace
 
 namespace electron {
 
@@ -21,12 +37,12 @@ OffScreenVideoConsumer::OffScreenVideoConsumer(
     : callback_(callback),
       view_(view),
       video_capturer_(view->CreateVideoCapturer()) {
-  video_capturer_->SetResolutionConstraints(view_->SizeInPixels(),
-                                            view_->SizeInPixels(), true);
   video_capturer_->SetAutoThrottlingEnabled(false);
   video_capturer_->SetMinSizeChangePeriod(base::TimeDelta());
   video_capturer_->SetFormat(media::PIXEL_FORMAT_ARGB);
-  SetFrameRate(view_->GetFrameRate());
+
+  SizeChanged(view_->SizeInPixels());
+  SetFrameRate(view_->frame_rate());
 }
 
 OffScreenVideoConsumer::~OffScreenVideoConsumer() = default;
@@ -43,9 +59,10 @@ void OffScreenVideoConsumer::SetFrameRate(int frame_rate) {
   video_capturer_->SetMinCapturePeriod(base::Seconds(1) / frame_rate);
 }
 
-void OffScreenVideoConsumer::SizeChanged() {
-  video_capturer_->SetResolutionConstraints(view_->SizeInPixels(),
-                                            view_->SizeInPixels(), true);
+void OffScreenVideoConsumer::SizeChanged(const gfx::Size& size_in_pixels) {
+  DCHECK(IsValidMinAndMaxFrameSize(size_in_pixels, size_in_pixels));
+  video_capturer_->SetResolutionConstraints(size_in_pixels, size_in_pixels,
+                                            true);
   video_capturer_->RequestRefreshFrame();
 }
 
@@ -58,9 +75,7 @@ void OffScreenVideoConsumer::OnFrameCaptured(
   auto& data_region = data->get_read_only_shmem_region();
 
   if (!CheckContentRect(content_rect)) {
-    gfx::Size view_size = view_->SizeInPixels();
-    video_capturer_->SetResolutionConstraints(view_size, view_size, true);
-    video_capturer_->RequestRefreshFrame();
+    SizeChanged(view_->SizeInPixels());
     return;
   }
 
@@ -105,7 +120,7 @@ void OffScreenVideoConsumer::OnFrameCaptured(
       SkImageInfo::MakeN32(content_rect.width(), content_rect.height(),
                            kPremul_SkAlphaType),
       pixels,
-      media::VideoFrame::RowBytes(media::VideoFrame::kARGBPlane,
+      media::VideoFrame::RowBytes(media::VideoFrame::Plane::kARGB,
                                   info->pixel_format, info->coded_size.width()),
       [](void* addr, void* context) {
         delete static_cast<FramePinner*>(context);
@@ -113,13 +128,16 @@ void OffScreenVideoConsumer::OnFrameCaptured(
       new FramePinner{std::move(mapping), callbacks_remote.Unbind()});
   bitmap.setImmutable();
 
-  absl::optional<gfx::Rect> update_rect = info->metadata.capture_update_rect;
+  std::optional<gfx::Rect> update_rect = info->metadata.capture_update_rect;
   if (!update_rect.has_value() || update_rect->IsEmpty()) {
     update_rect = content_rect;
   }
 
   callback_.Run(*update_rect, bitmap);
 }
+
+void OffScreenVideoConsumer::OnNewSubCaptureTargetVersion(
+    uint32_t crop_version) {}
 
 void OffScreenVideoConsumer::OnFrameWithEmptyRegionCapture() {}
 

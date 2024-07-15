@@ -20,8 +20,9 @@ In addition, there are some subtle differences on each platform:
 
 On macOS, the `autoUpdater` module is built upon [Squirrel.Mac][squirrel-mac],
 meaning you don't need any special setup to make it work. For server-side
-requirements, you can read [Server Support][server-support]. Note that [App
-Transport Security](https://developer.apple.com/library/content/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html#//apple_ref/doc/uid/TP40009251-SW35) (ATS) applies to all requests made as part of the
+requirements, you can read [Server Support][server-support]. Note that
+[App Transport Security](https://developer.apple.com/library/content/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html#//apple_ref/doc/uid/TP40009251-SW35)
+(ATS) applies to all requests made as part of the
 update process. Apps that need to disable ATS can add the
 `NSAllowsArbitraryLoads` key to their app's plist.
 
@@ -32,9 +33,9 @@ This is a requirement of `Squirrel.Mac`.
 
 On Windows, you have to install your app into a user's machine before you can
 use the `autoUpdater`, so it is recommended that you use the
-[electron-winstaller][installer-lib], [electron-forge][electron-forge-lib] or the [grunt-electron-installer][installer] package to generate a Windows installer.
+[electron-winstaller][installer-lib], [Electron Forge][electron-forge-lib] or the [grunt-electron-installer][installer] package to generate a Windows installer.
 
-When using [electron-winstaller][installer-lib] or [electron-forge][electron-forge-lib] make sure you do not try to update your app [the first time it runs](https://github.com/electron/windows-installer#handling-squirrel-events) (Also see [this issue for more info](https://github.com/electron/electron/issues/7155)). It's also recommended to use [electron-squirrel-startup](https://github.com/mongodb-js/electron-squirrel-startup) to get desktop shortcuts for your app.
+When using [electron-winstaller][installer-lib] or [Electron Forge][electron-forge-lib] make sure you do not try to update your app [the first time it runs](https://github.com/electron/windows-installer#handling-squirrel-events) (Also see [this issue for more info](https://github.com/electron/electron/issues/7155)). It's also recommended to use [electron-squirrel-startup](https://github.com/mongodb-js/electron-squirrel-startup) to get desktop shortcuts for your app.
 
 The installer generated with Squirrel will create a shortcut icon with an
 [Application User Model ID][app-user-model-id] in the format of
@@ -103,7 +104,7 @@ The `autoUpdater` object has the following methods:
 
 * `options` Object
   * `url` string
-  * `headers` Record<string, string> (optional) _macOS_ - HTTP request headers.
+  * `headers` Record\<string, string\> (optional) _macOS_ - HTTP request headers.
   * `serverType` string (optional) _macOS_ - Can be `json` or `default`, see the [Squirrel.Mac][squirrel-mac]
     README for more information.
 
@@ -137,8 +138,8 @@ application starts.
 [squirrel-mac]: https://github.com/Squirrel/Squirrel.Mac
 [server-support]: https://github.com/Squirrel/Squirrel.Mac#server-support
 [squirrel-windows]: https://github.com/Squirrel/Squirrel.Windows
-[installer]: https://github.com/electron/grunt-electron-installer
+[installer]: https://github.com/electron-archive/grunt-electron-installer
 [installer-lib]: https://github.com/electron/windows-installer
-[electron-forge-lib]: https://github.com/electron-userland/electron-forge
-[app-user-model-id]: https://msdn.microsoft.com/en-us/library/windows/desktop/dd378459(v=vs.85).aspx
+[electron-forge-lib]: https://github.com/electron/forge
+[app-user-model-id]: https://learn.microsoft.com/en-us/windows/win32/shell/appids
 [event-emitter]: https://nodejs.org/api/events.html#events_class_eventemitter

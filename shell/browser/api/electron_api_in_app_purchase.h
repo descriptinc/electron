@@ -16,13 +16,11 @@
 #include "shell/browser/mac/in_app_purchase_product.h"
 #include "v8/include/v8.h"
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 class InAppPurchase : public gin::Wrappable<InAppPurchase>,
                       public gin_helper::EventEmitterMixin<InAppPurchase>,
-                      public in_app_purchase::TransactionObserver {
+                      private in_app_purchase::TransactionObserver {
  public:
   static gin::Handle<InAppPurchase> Create(v8::Isolate* isolate);
 
@@ -51,8 +49,6 @@ class InAppPurchase : public gin::Wrappable<InAppPurchase>,
       const std::vector<in_app_purchase::Transaction>& transactions) override;
 };
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 #endif  // ELECTRON_SHELL_BROWSER_API_ELECTRON_API_IN_APP_PURCHASE_H_

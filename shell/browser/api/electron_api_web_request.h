@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 
+#include "base/memory/raw_ptr.h"
 #include "base/values.h"
 #include "extensions/common/url_pattern.h"
 #include "gin/arguments.h"
@@ -19,14 +20,10 @@ namespace content {
 class BrowserContext;
 }
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 class WebRequest : public gin::Wrappable<WebRequest>, public WebRequestAPI {
  public:
-  static gin::WrapperInfo kWrapperInfo;
-
   // Return the WebRequest object attached to |browser_context|, create if there
   // is no one.
   // Note that the lifetime of WebRequest object is managed by Session, instead
@@ -45,6 +42,7 @@ class WebRequest : public gin::Wrappable<WebRequest>, public WebRequestAPI {
                                       content::BrowserContext* browser_context);
 
   // gin::Wrappable:
+  static gin::WrapperInfo kWrapperInfo;
   gin::ObjectTemplateBuilder GetObjectTemplateBuilder(
       v8::Isolate* isolate) override;
   const char* GetTypeName() override;
@@ -86,6 +84,10 @@ class WebRequest : public gin::Wrappable<WebRequest>, public WebRequestAPI {
   WebRequest(v8::Isolate* isolate, content::BrowserContext* browser_context);
   ~WebRequest() override;
 
+  // Contains info about requests that are blocked waiting for a response from
+  // the user.
+  struct BlockedRequest;
+
   enum class SimpleEvent {
     kOnSendHeaders,
     kOnBeforeRedirect,
@@ -93,6 +95,7 @@ class WebRequest : public gin::Wrappable<WebRequest>, public WebRequestAPI {
     kOnCompleted,
     kOnErrorOccurred,
   };
+
   enum class ResponseEvent {
     kOnBeforeRequest,
     kOnBeforeSendHeaders,
@@ -115,44 +118,78 @@ class WebRequest : public gin::Wrappable<WebRequest>, public WebRequestAPI {
   void HandleSimpleEvent(SimpleEvent event,
                          extensions::WebRequestInfo* info,
                          Args... args);
-  template <typename Out, typename... Args>
-  int HandleResponseEvent(ResponseEvent event,
-                          extensions::WebRequestInfo* info,
-                          net::CompletionOnceCallback callback,
-                          Out out,
-                          Args... args);
 
-  template <typename T>
-  void OnListenerResult(uint64_t id, T out, v8::Local<v8::Value> response);
+  int HandleOnBeforeRequestResponseEvent(
+      extensions::WebRequestInfo* info,
+      const network::ResourceRequest& request,
+      net::CompletionOnceCallback callback,
+      GURL* redirect_url);
+  int HandleOnBeforeSendHeadersResponseEvent(
+      extensions::WebRequestInfo* info,
+      const network::ResourceRequest& request,
+      BeforeSendHeadersCallback callback,
+      net::HttpRequestHeaders* headers);
+  int HandleOnHeadersReceivedResponseEvent(
+      extensions::WebRequestInfo* info,
+      const network::ResourceRequest& request,
+      net::CompletionOnceCallback callback,
+      const net::HttpResponseHeaders* original_response_headers,
+      scoped_refptr<net::HttpResponseHeaders>* override_response_headers);
+
+  void OnBeforeRequestListenerResult(uint64_t id,
+                                     v8::Local<v8::Value> response);
+  void OnBeforeSendHeadersListenerResult(uint64_t id,
+                                         v8::Local<v8::Value> response);
+  void OnHeadersReceivedListenerResult(uint64_t id,
+                                       v8::Local<v8::Value> response);
+
+  class RequestFilter {
+   public:
+    RequestFilter(std::set<URLPattern>,
+                  std::set<extensions::WebRequestResourceType>);
+    RequestFilter(const RequestFilter&);
+    RequestFilter();
+    ~RequestFilter();
+
+    void AddUrlPattern(URLPattern pattern);
+    void AddType(extensions::WebRequestResourceType type);
+
+    bool MatchesRequest(extensions::WebRequestInfo* info) const;
+
+   private:
+    bool MatchesURL(const GURL& url) const;
+    bool MatchesType(extensions::WebRequestResourceType type) const;
+
+    std::set<URLPattern> url_patterns_;
+    std::set<extensions::WebRequestResourceType> types_;
+  };
 
   struct SimpleListenerInfo {
-    std::set<URLPattern> url_patterns;
+    RequestFilter filter;
     SimpleListener listener;
 
-    SimpleListenerInfo(std::set<URLPattern>, SimpleListener);
+    SimpleListenerInfo(RequestFilter, SimpleListener);
     SimpleListenerInfo();
     ~SimpleListenerInfo();
   };
 
   struct ResponseListenerInfo {
-    std::set<URLPattern> url_patterns;
+    RequestFilter filter;
     ResponseListener listener;
 
-    ResponseListenerInfo(std::set<URLPattern>, ResponseListener);
+    ResponseListenerInfo(RequestFilter, ResponseListener);
     ResponseListenerInfo();
     ~ResponseListenerInfo();
   };
 
   std::map<SimpleEvent, SimpleListenerInfo> simple_listeners_;
   std::map<ResponseEvent, ResponseListenerInfo> response_listeners_;
-  std::map<uint64_t, net::CompletionOnceCallback> callbacks_;
+  std::map<uint64_t, BlockedRequest> blocked_requests_;
 
   // Weak-ref, it manages us.
-  content::BrowserContext* browser_context_;
+  raw_ptr<content::BrowserContext> browser_context_;
 };
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 #endif  // ELECTRON_SHELL_BROWSER_API_ELECTRON_API_WEB_REQUEST_H_

@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const webpack = require('webpack');
 const TerserPlugin = require('terser-webpack-plugin');
 const WrapperPlugin = require('wrapper-webpack-plugin');
@@ -53,20 +53,6 @@ module.exports = ({
 
     const ignoredModules = [];
 
-    if (defines.ENABLE_DESKTOP_CAPTURER === 'false') {
-      ignoredModules.push(
-        '@electron/internal/browser/desktop-capturer',
-        '@electron/internal/browser/api/desktop-capturer',
-        '@electron/internal/renderer/api/desktop-capturer'
-      );
-    }
-
-    if (defines.ENABLE_VIEWS_API === 'false') {
-      ignoredModules.push(
-        '@electron/internal/browser/api/views/image-view.js'
-      );
-    }
-
     const plugins = [];
 
     if (onlyPrintingGraph) {
@@ -75,9 +61,17 @@ module.exports = ({
 
     if (targetDeletesNodeGlobals) {
       plugins.push(new webpack.ProvidePlugin({
-        process: ['@electron/internal/common/webpack-provider', 'process'],
+        Buffer: ['@electron/internal/common/webpack-provider', 'Buffer'],
         global: ['@electron/internal/common/webpack-provider', '_global'],
-        Buffer: ['@electron/internal/common/webpack-provider', 'Buffer']
+        process: ['@electron/internal/common/webpack-provider', 'process']
+      }));
+    }
+
+    // Webpack 5 no longer polyfills process or Buffer.
+    if (!alwaysHasNode) {
+      plugins.push(new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+        process: 'process/browser'
       }));
     }
 
@@ -129,7 +123,12 @@ if ((globalThis.process || binding.process).argv.includes("--profile-electron-in
           // Force timers to resolve to our dependency that doesn't use window.postMessage
           timers: path.resolve(electronRoot, 'node_modules', 'timers-browserify', 'main.js')
         },
-        extensions: ['.ts', '.js']
+        extensions: ['.ts', '.js'],
+        fallback: {
+          // We provide our own "timers" import above, any usage of setImmediate inside
+          // one of our renderer bundles should import it from the 'timers' package
+          setImmediate: false
+        }
       },
       module: {
         rules: [{
@@ -150,10 +149,7 @@ if ((globalThis.process || binding.process).argv.includes("--profile-electron-in
       },
       node: {
         __dirname: false,
-        __filename: false,
-        // We provide our own "timers" import above, any usage of setImmediate inside
-        // one of our renderer bundles should import it from the 'timers' package
-        setImmediate: false
+        __filename: false
       },
       optimization: {
         minimize: env.mode === 'production',

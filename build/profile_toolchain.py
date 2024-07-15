@@ -1,4 +1,5 @@
-from __future__ import with_statement
+#!/usr/bin/env python3
+
 import contextlib
 import sys
 import os
@@ -33,36 +34,10 @@ def calculate_hash(root):
         return CalculateHash('.', None)
 
 def windows_installed_software():
-    import win32com.client
-    strComputer = "."
-    objWMIService = win32com.client.Dispatch("WbemScripting.SWbemLocator")
-    objSWbemServices = objWMIService.ConnectServer(strComputer, "root\cimv2")
-    colItems = objSWbemServices.ExecQuery("Select * from Win32_Product")
-    items = []
-
-    for objItem in colItems:
-        item = {}
-        if objItem.Caption:
-            item['caption'] = objItem.Caption
-        if objItem.Caption:
-            item['description'] = objItem.Description
-        if objItem.InstallDate:
-            item['install_date'] = objItem.InstallDate
-        if objItem.InstallDate2:
-            item['install_date_2'] = objItem.InstallDate2
-        if objItem.InstallLocation:
-            item['install_location'] = objItem.InstallLocation
-        if objItem.Name:
-            item['name'] = objItem.Name
-        if objItem.SKUNumber:
-            item['sku_number'] = objItem.SKUNumber
-        if objItem.Vendor:
-            item['vendor'] = objItem.Vendor
-        if objItem.Version:
-            item['version'] = objItem.Version
-        items.append(item)
-
-    return items
+    # file_path = os.path.join(os.getcwd(), 'installed_software.json')
+    # return json.loads(open('installed_software.json').read().decode('utf-8'))
+    f = open('installed_software.json', encoding='utf-8-sig')
+    return json.load(f)
 
 
 def windows_profile():
@@ -89,7 +64,7 @@ def windows_profile():
 
 def main(options):
     if sys.platform == 'win32':
-        with open(options.output_json, 'wb') as f:
+        with open(options.output_json, 'w') as f:
             json.dump(windows_profile(), f)
     else:
         raise OSError("Unsupported OS")

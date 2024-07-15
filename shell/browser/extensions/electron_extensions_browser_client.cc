@@ -4,12 +4,12 @@
 
 #include "shell/browser/extensions/electron_extensions_browser_client.h"
 
+#include <algorithm>
 #include <utility>
 
-#include "base/bind.h"
+#include "base/functional/bind.h"
 #include "base/memory/ptr_util.h"
 #include "base/path_service.h"
-#include "base/task/post_task.h"
 #include "build/build_config.h"
 #include "chrome/browser/extensions/chrome_url_request_util.h"
 #include "chrome/common/chrome_paths.h"
@@ -20,9 +20,9 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/common/user_agent.h"
+#include "extensions/browser/api/core_extensions_browser_api_provider.h"
 #include "extensions/browser/api/extensions_api_client.h"
 #include "extensions/browser/component_extension_resource_manager.h"
-#include "extensions/browser/core_extensions_browser_api_provider.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_protocols.h"
 #include "extensions/browser/extensions_browser_interface_binders.h"
@@ -85,7 +85,7 @@ bool ElectronExtensionsBrowserClient::AreExtensionsDisabled(
   return false;
 }
 
-bool ElectronExtensionsBrowserClient::IsValidContext(BrowserContext* context) {
+bool ElectronExtensionsBrowserClient::IsValidContext(void* context) {
   auto& context_map = ElectronBrowserContext::browser_context_map();
   for (auto const& entry : context_map) {
     if (entry.second && entry.second.get() == context)
@@ -118,6 +118,31 @@ BrowserContext* ElectronExtensionsBrowserClient::GetOriginalContext(
   } else {
     return context;
   }
+}
+
+content::BrowserContext*
+ElectronExtensionsBrowserClient::GetContextRedirectedToOriginal(
+    content::BrowserContext* context,
+    bool force_guest_profile) {
+  return GetOriginalContext(context);
+}
+
+content::BrowserContext* ElectronExtensionsBrowserClient::GetContextOwnInstance(
+    content::BrowserContext* context,
+    bool force_guest_profile) {
+  return context;
+}
+
+content::BrowserContext*
+ElectronExtensionsBrowserClient::GetContextForOriginalOnly(
+    content::BrowserContext* context,
+    bool force_guest_profile) {
+  return context->IsOffTheRecord() ? nullptr : context;
+}
+
+bool ElectronExtensionsBrowserClient::AreExtensionsDisabledForContext(
+    content::BrowserContext* context) {
+  return false;
 }
 
 bool ElectronExtensionsBrowserClient::IsGuestSession(
@@ -243,6 +268,14 @@ ElectronExtensionsBrowserClient::GetProcessManagerDelegate() const {
   return process_manager_delegate_.get();
 }
 
+mojo::PendingRemote<network::mojom::URLLoaderFactory>
+ElectronExtensionsBrowserClient::GetControlledFrameEmbedderURLLoader(
+    const url::Origin& app_origin,
+    int frame_tree_node_id,
+    content::BrowserContext* browser_context) {
+  return mojo::PendingRemote<network::mojom::URLLoaderFactory>();
+}
+
 std::unique_ptr<extensions::ExtensionHostDelegate>
 ElectronExtensionsBrowserClient::
     CreateExtensionHostDelegate() {  // TODO(samuelmaddock):
@@ -298,11 +331,11 @@ ElectronExtensionsBrowserClient::GetComponentExtensionResourceManager() {
 void ElectronExtensionsBrowserClient::BroadcastEventToRenderers(
     extensions::events::HistogramValue histogram_value,
     const std::string& event_name,
-    std::unique_ptr<base::ListValue> args,
+    base::Value::List args,
     bool dispatch_to_off_the_record_profiles) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::UI)) {
-    base::PostTask(
-        FROM_HERE, {BrowserThread::UI},
+    content::GetUIThreadTaskRunner({})->PostTask(
+        FROM_HERE,
         base::BindOnce(
             &ElectronExtensionsBrowserClient::BroadcastEventToRenderers,
             base::Unretained(this), histogram_value, event_name,
@@ -310,13 +343,12 @@ void ElectronExtensionsBrowserClient::BroadcastEventToRenderers(
     return;
   }
 
-  auto event = std::make_unique<extensions::Event>(
-      histogram_value, event_name, std::move(*args).TakeListDeprecated());
-  auto& context_map = ElectronBrowserContext::browser_context_map();
-  for (auto const& entry : context_map) {
-    if (entry.second) {
-      extensions::EventRouter::Get(entry.second.get())
-          ->BroadcastEvent(std::move(event));
+  for (auto const& [key, browser_context] :
+       ElectronBrowserContext::browser_context_map()) {
+    if (browser_context) {
+      extensions::EventRouter::Get(browser_context.get())
+          ->BroadcastEvent(std::make_unique<extensions::Event>(
+              histogram_value, event_name, args.Clone()));
     }
   }
 }

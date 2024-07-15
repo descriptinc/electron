@@ -4,6 +4,7 @@
 
 // Most code came from: chrome/browser/chrome_browser_main_posix.cc.
 
+#include "base/notreached.h"
 #include "shell/browser/electron_browser_main_parts.h"
 
 #include <errno.h>
@@ -15,7 +16,7 @@
 
 #include "base/debug/leak_annotations.h"
 #include "base/posix/eintr_wrapper.h"
-#include "base/task/post_task.h"
+#include "base/threading/platform_thread.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "shell/browser/browser.h"
@@ -139,11 +140,11 @@ void ShutdownDetector::ThreadMain() {
         read(shutdown_fd_, reinterpret_cast<char*>(&signal) + bytes_read,
              sizeof(signal) - bytes_read));
     if (ret < 0) {
-      NOTREACHED() << "Unexpected error: " << strerror(errno);
+      NOTREACHED_IN_MIGRATION() << "Unexpected error: " << strerror(errno);
       ShutdownFDReadError();
       break;
     } else if (ret == 0) {
-      NOTREACHED() << "Unexpected closure of shutdown pipe.";
+      NOTREACHED_IN_MIGRATION() << "Unexpected closure of shutdown pipe.";
       ShutdownFDClosedError();
       break;
     }

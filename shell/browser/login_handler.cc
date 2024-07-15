@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "base/callback.h"
-#include "base/threading/sequenced_task_runner_handle.h"
+#include "base/functional/callback.h"
+#include "base/task/sequenced_task_runner.h"
 #include "gin/arguments.h"
 #include "gin/dictionary.h"
 #include "shell/browser/api/electron_api_web_contents.h"
@@ -34,7 +34,7 @@ LoginHandler::LoginHandler(
       auth_required_callback_(std::move(auth_required_callback)) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
-  base::SequencedTaskRunnerHandle::Get()->PostTask(
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
       base::BindOnce(&LoginHandler::EmitEvent, weak_factory_.GetWeakPtr(),
                      auth_info, is_main_frame, url, response_headers,
@@ -52,7 +52,7 @@ void LoginHandler::EmitEvent(
 
   api::WebContents* api_web_contents = api::WebContents::From(web_contents());
   if (!api_web_contents) {
-    std::move(auth_required_callback_).Run(absl::nullopt);
+    std::move(auth_required_callback_).Run(std::nullopt);
     return;
   }
 
@@ -75,7 +75,7 @@ void LoginHandler::EmitEvent(
   // deleted. Check the weak ptr before accessing any member variables to
   // prevent UAF.
   if (weak_this && !default_prevented && auth_required_callback_) {
-    std::move(auth_required_callback_).Run(absl::nullopt);
+    std::move(auth_required_callback_).Run(std::nullopt);
   }
 }
 
@@ -85,7 +85,7 @@ void LoginHandler::CallbackFromJS(gin::Arguments* args) {
   if (auth_required_callback_) {
     std::u16string username, password;
     if (!args->GetNext(&username) || !args->GetNext(&password)) {
-      std::move(auth_required_callback_).Run(absl::nullopt);
+      std::move(auth_required_callback_).Run(std::nullopt);
       return;
     }
     std::move(auth_required_callback_)

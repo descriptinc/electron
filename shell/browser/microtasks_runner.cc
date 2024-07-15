@@ -26,10 +26,10 @@ void MicrotasksRunner::DidProcessTask(const base::PendingTask& pending_task) {
   // https://github.com/electron/electron/issues/20013 Node.js now performs its
   // own microtask checkpoint and it may happen is some situations that there is
   // contention for performing checkpoint between Node.js and chromium, ending
-  // up Node.js dealying its callbacks. To fix this, now we always lets Node.js
+  // up Node.js delaying its callbacks. To fix this, now we always lets Node.js
   // handle the checkpoint in the browser process.
   {
-    v8::HandleScope scope(isolate_);
+    v8::HandleScope handle_scope(isolate_);
     node::CallbackScope microtasks_scope(isolate_, v8::Object::New(isolate_),
                                          {0, 0});
   }

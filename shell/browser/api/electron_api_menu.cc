@@ -11,6 +11,7 @@
 #include "shell/browser/native_window.h"
 #include "shell/common/gin_converters/accelerator_converter.h"
 #include "shell/common/gin_converters/callback_converter.h"
+#include "shell/common/gin_converters/content_converter.h"
 #include "shell/common/gin_converters/file_path_converter.h"
 #include "shell/common/gin_converters/gurl_converter.h"
 #include "shell/common/gin_converters/image_converter.h"
@@ -44,9 +45,7 @@ struct Converter<SharingItem> {
 
 #endif
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 gin::WrapperInfo Menu::kWrapperInfo = {gin::kEmbedderNativeGin};
 
@@ -146,7 +145,6 @@ void Menu::OnMenuWillShow(ui::SimpleMenuModel* source) {
 base::OnceClosure Menu::BindSelfToClosure(base::OnceClosure callback) {
   // return ((callback, ref) => { callback() }).bind(null, callback, this)
   v8::Isolate* isolate = JavascriptEnvironment::GetIsolate();
-  v8::Locker locker(isolate);
   v8::HandleScope scope(isolate);
   v8::Local<v8::Object> self;
   if (GetWrapper(isolate).ToLocal(&self)) {
@@ -213,7 +211,7 @@ void Menu::Clear() {
 }
 
 int Menu::GetIndexOfCommandId(int command_id) const {
-  return model_->GetIndexOfCommandId(command_id);
+  return model_->GetIndexOfCommandId(command_id).value_or(-1);
 }
 
 int Menu::GetItemCount() const {
@@ -269,10 +267,9 @@ void Menu::OnMenuWillShow() {
 }
 
 // static
-v8::Local<v8::ObjectTemplate> Menu::FillObjectTemplate(
-    v8::Isolate* isolate,
-    v8::Local<v8::ObjectTemplate> templ) {
-  return gin::ObjectTemplateBuilder(isolate, "Menu", templ)
+void Menu::FillObjectTemplate(v8::Isolate* isolate,
+                              v8::Local<v8::ObjectTemplate> templ) {
+  gin::ObjectTemplateBuilder(isolate, "Menu", templ)
       .SetMethod("insertItem", &Menu::InsertItemAt)
       .SetMethod("insertCheckItem", &Menu::InsertCheckItemAt)
       .SetMethod("insertRadioItem", &Menu::InsertRadioItemAt)
@@ -302,9 +299,11 @@ v8::Local<v8::ObjectTemplate> Menu::FillObjectTemplate(
       .Build();
 }
 
-}  // namespace api
+const char* Menu::GetTypeName() {
+  return GetClassName();
+}
 
-}  // namespace electron
+}  // namespace electron::api
 
 namespace {
 
@@ -327,4 +326,4 @@ void Initialize(v8::Local<v8::Object> exports,
 
 }  // namespace
 
-NODE_LINKED_MODULE_CONTEXT_AWARE(electron_browser_menu, Initialize)
+NODE_LINKED_BINDING_CONTEXT_AWARE(electron_browser_menu, Initialize)

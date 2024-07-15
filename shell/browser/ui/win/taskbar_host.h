@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "shell/browser/native_window.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/image/image.h"
@@ -52,7 +52,7 @@ class TaskbarHost {
 
   // Set the overlay icon in taskbar.
   bool SetOverlayIcon(HWND window,
-                      const SkBitmap& overlay,
+                      const SkBitmap& bitmap,
                       const std::string& text);
 
   // Set the region of the window to show as a thumbnail in taskbar.

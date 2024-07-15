@@ -5,41 +5,62 @@
 #include "shell/browser/api/electron_api_safe_storage.h"
 
 #include <string>
-#include <vector>
 
-#include "components/os_crypt/os_crypt.h"
+#include "components/os_crypt/sync/os_crypt.h"
 #include "shell/browser/browser.h"
+#include "shell/browser/browser_process_impl.h"
 #include "shell/common/gin_converters/base_converter.h"
 #include "shell/common/gin_converters/callback_converter.h"
 #include "shell/common/gin_helper/dictionary.h"
 #include "shell/common/node_includes.h"
 #include "shell/common/platform_util.h"
 
-namespace electron {
-
-namespace safestorage {
+namespace electron::safestorage {
 
 static const char* kEncryptionVersionPrefixV10 = "v10";
 static const char* kEncryptionVersionPrefixV11 = "v11";
+static bool use_password_v10 = false;
 
-#if DCHECK_IS_ON()
-static bool electron_crypto_ready = false;
+bool IsEncryptionAvailable() {
+#if BUILDFLAG(IS_LINUX)
+  // Calling IsEncryptionAvailable() before the app is ready results in a crash
+  // on Linux.
+  // Refs: https://github.com/electron/electron/issues/32206.
+  if (!Browser::Get()->is_ready())
+    return false;
+  return OSCrypt::IsEncryptionAvailable() ||
+         (use_password_v10 &&
+          static_cast<BrowserProcessImpl*>(g_browser_process)
+                  ->linux_storage_backend() == "basic_text");
+#else
+  return OSCrypt::IsEncryptionAvailable();
+#endif
+}
 
-void SetElectronCryptoReady(bool ready) {
-  electron_crypto_ready = ready;
+void SetUsePasswordV10(bool use) {
+  use_password_v10 = use;
+}
+
+#if BUILDFLAG(IS_LINUX)
+std::string GetSelectedLinuxBackend() {
+  if (!Browser::Get()->is_ready())
+    return "unknown";
+  return static_cast<BrowserProcessImpl*>(g_browser_process)
+      ->linux_storage_backend();
 }
 #endif
 
-bool IsEncryptionAvailable() {
-  return OSCrypt::IsEncryptionAvailable();
-}
-
 v8::Local<v8::Value> EncryptString(v8::Isolate* isolate,
                                    const std::string& plaintext) {
-  if (!OSCrypt::IsEncryptionAvailable()) {
+  if (!IsEncryptionAvailable()) {
+    if (!Browser::Get()->is_ready()) {
+      gin_helper::ErrorThrower(isolate).ThrowError(
+          "safeStorage cannot be used before app is ready");
+      return v8::Local<v8::Value>();
+    }
     gin_helper::ErrorThrower(isolate).ThrowError(
-        "Error while decrypting the ciphertext provided to "
-        "safeStorage.decryptString. "
+        "Error while encrypting the text provided to "
+        "safeStorage.encryptString. "
         "Encryption is not available.");
     return v8::Local<v8::Value>();
   }
@@ -59,7 +80,12 @@ v8::Local<v8::Value> EncryptString(v8::Isolate* isolate,
 }
 
 std::string DecryptString(v8::Isolate* isolate, v8::Local<v8::Value> buffer) {
-  if (!OSCrypt::IsEncryptionAvailable()) {
+  if (!IsEncryptionAvailable()) {
+    if (!Browser::Get()->is_ready()) {
+      gin_helper::ErrorThrower(isolate).ThrowError(
+          "safeStorage cannot be used before app is ready");
+      return "";
+    }
     gin_helper::ErrorThrower(isolate).ThrowError(
         "Error while decrypting the ciphertext provided to "
         "safeStorage.decryptString. "
@@ -102,9 +128,7 @@ std::string DecryptString(v8::Isolate* isolate, v8::Local<v8::Value> buffer) {
   return plaintext;
 }
 
-}  // namespace safestorage
-
-}  // namespace electron
+}  // namespace electron::safestorage
 
 void Initialize(v8::Local<v8::Object> exports,
                 v8::Local<v8::Value> unused,
@@ -116,6 +140,12 @@ void Initialize(v8::Local<v8::Object> exports,
                  &electron::safestorage::IsEncryptionAvailable);
   dict.SetMethod("encryptString", &electron::safestorage::EncryptString);
   dict.SetMethod("decryptString", &electron::safestorage::DecryptString);
+  dict.SetMethod("setUsePlainTextEncryption",
+                 &electron::safestorage::SetUsePasswordV10);
+#if BUILDFLAG(IS_LINUX)
+  dict.SetMethod("getSelectedStorageBackend",
+                 &electron::safestorage::GetSelectedLinuxBackend);
+#endif
 }
 
-NODE_LINKED_MODULE_CONTEXT_AWARE(electron_browser_safe_storage, Initialize)
+NODE_LINKED_BINDING_CONTEXT_AWARE(electron_browser_safe_storage, Initialize)

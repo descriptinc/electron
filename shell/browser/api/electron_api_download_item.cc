@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "base/strings/utf_string_conversions.h"
-#include "base/threading/thread_task_runner_handle.h"
 #include "net/base/filename_util.h"
 #include "shell/browser/electron_browser_main_parts.h"
 #include "shell/common/gin_converters/file_dialog_converter.h"
@@ -48,9 +47,7 @@ struct Converter<download::DownloadItem::DownloadState> {
 
 }  // namespace gin
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 namespace {
 
@@ -248,7 +245,7 @@ std::string DownloadItem::GetETag() const {
 double DownloadItem::GetStartTime() const {
   if (!CheckAlive())
     return 0;
-  return download_item_->GetStartTime().ToDoubleT();
+  return download_item_->GetStartTime().InSecondsFSinceUnixEpoch();
 }
 
 // static
@@ -301,6 +298,4 @@ gin::Handle<DownloadItem> DownloadItem::FromOrCreate(
   return handle;
 }
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api

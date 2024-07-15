@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
 #include "base/memory/shared_memory_mapping.h"
 #include "components/viz/host/host_display_client.h"
 #include "services/viz/privileged/mojom/compositing/layered_window_updater.mojom.h"
@@ -63,6 +63,7 @@ class OffScreenHostDisplayClient : public viz::HostDisplayClient {
   void SetActive(bool active);
 
  private:
+  // viz::HostDisplayClient
 #if BUILDFLAG(IS_MAC)
   void OnDisplayReceivedCALayerParams(
       const gfx::CALayerParams& ca_layer_params) override;

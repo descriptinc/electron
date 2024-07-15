@@ -21,9 +21,7 @@
 #include "ui/gfx/sys_color_change_listener.h"
 #endif
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 #if BUILDFLAG(IS_MAC)
 enum class NotificationCenterKind {
@@ -67,26 +65,26 @@ class SystemPreferences
   void OnSysColorChange() override;
 
   // BrowserObserver:
-  void OnFinishLaunching(const base::DictionaryValue& launch_info) override;
+  void OnFinishLaunching(base::Value::Dict launch_info) override;
 
 #elif BUILDFLAG(IS_MAC)
   using NotificationCallback = base::RepeatingCallback<
-      void(const std::string&, base::DictionaryValue, const std::string&)>;
+      void(const std::string&, base::Value, const std::string&)>;
 
   void PostNotification(const std::string& name,
-                        base::DictionaryValue user_info,
+                        base::Value::Dict user_info,
                         gin::Arguments* args);
-  int SubscribeNotification(const std::string& name,
+  int SubscribeNotification(v8::Local<v8::Value> maybe_name,
                             const NotificationCallback& callback);
   void UnsubscribeNotification(int id);
   void PostLocalNotification(const std::string& name,
-                             base::DictionaryValue user_info);
-  int SubscribeLocalNotification(const std::string& name,
+                             base::Value::Dict user_info);
+  int SubscribeLocalNotification(v8::Local<v8::Value> maybe_name,
                                  const NotificationCallback& callback);
   void UnsubscribeLocalNotification(int request_id);
   void PostWorkspaceNotification(const std::string& name,
-                                 base::DictionaryValue user_info);
-  int SubscribeWorkspaceNotification(const std::string& name,
+                                 base::Value::Dict user_info);
+  int SubscribeWorkspaceNotification(v8::Local<v8::Value> maybe_name,
                                      const NotificationCallback& callback);
   void UnsubscribeWorkspaceNotification(int request_id);
   v8::Local<v8::Value> GetUserDefault(v8::Isolate* isolate,
@@ -98,6 +96,7 @@ class SystemPreferences
                       gin::Arguments* args);
   void RemoveUserDefault(const std::string& name);
   bool IsSwipeTrackingFromScrollEventsEnabled();
+  bool AccessibilityDisplayShouldReduceTransparency();
 
   std::string GetSystemColor(gin_helper::ErrorThrower thrower,
                              const std::string& color);
@@ -114,11 +113,7 @@ class SystemPreferences
   // TODO(MarshallOfSound): Write tests for these methods once we
   // are running tests on a Mojave machine
   v8::Local<v8::Value> GetEffectiveAppearance(v8::Isolate* isolate);
-  v8::Local<v8::Value> GetAppLevelAppearance(v8::Isolate* isolate);
-  void SetAppLevelAppearance(gin::Arguments* args);
 #endif
-  bool IsInvertedColorScheme();
-  bool IsHighContrastColorScheme();
   v8::Local<v8::Value> GetAnimationSettings(v8::Isolate* isolate);
 
   // disable copy
@@ -130,7 +125,7 @@ class SystemPreferences
   ~SystemPreferences() override;
 
 #if BUILDFLAG(IS_MAC)
-  int DoSubscribeNotification(const std::string& name,
+  int DoSubscribeNotification(v8::Local<v8::Value> maybe_name,
                               const NotificationCallback& callback,
                               NotificationCenterKind kind);
   void DoUnsubscribeNotification(int request_id, NotificationCenterKind kind);
@@ -160,16 +155,10 @@ class SystemPreferences
 
   std::string current_color_;
 
-  bool invertered_color_scheme_ = false;
-
-  bool high_contrast_color_scheme_ = false;
-
   std::unique_ptr<gfx::ScopedSysColorChangeListener> color_change_listener_;
 #endif
 };
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 #endif  // ELECTRON_SHELL_BROWSER_API_ELECTRON_API_SYSTEM_PREFERENCES_H_

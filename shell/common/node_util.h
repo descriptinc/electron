@@ -7,15 +7,14 @@
 
 #include <vector>
 
+#include "build/build_config.h"
 #include "v8/include/v8.h"
 
 namespace node {
 class Environment;
 }
 
-namespace electron {
-
-namespace util {
+namespace electron::util {
 
 // Run a script with JS source bundled inside the binary as if it's wrapped
 // in a function called with a null receiver and arguments specified in C++.
@@ -26,11 +25,8 @@ v8::MaybeLocal<v8::Value> CompileAndCall(
     v8::Local<v8::Context> context,
     const char* id,
     std::vector<v8::Local<v8::String>>* parameters,
-    std::vector<v8::Local<v8::Value>>* arguments,
-    node::Environment* optional_env);
+    std::vector<v8::Local<v8::Value>>* arguments);
 
-}  // namespace util
-
-}  // namespace electron
+}  // namespace electron::util
 
 #endif  // ELECTRON_SHELL_COMMON_NODE_UTIL_H_

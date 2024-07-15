@@ -4,14 +4,16 @@
 
 #include "shell/common/crash_keys.h"
 
+#include <cstdint>
 #include <deque>
-#include <utility>
-#include <vector>
+#include <map>
+#include <string>
 
 #include "base/command_line.h"
 #include "base/environment.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_split.h"
+#include "base/strings/stringprintf.h"
 #include "components/crash/core/common/crash_key.h"
 #include "content/public/common/content_switches.h"
 #include "electron/buildflags/buildflags.h"
@@ -23,20 +25,11 @@
 #include "shell/common/process_util.h"
 #include "third_party/crashpad/crashpad/client/annotation.h"
 
-namespace electron {
-
-namespace crash_keys {
+namespace electron::crash_keys {
 
 namespace {
 
-#if BUILDFLAG(IS_LINUX)
-// Breakpad has a flawed system of calculating the number of chunks
-// we add 127 bytes to force an extra chunk
-constexpr size_t kMaxCrashKeyValueSize = 20479;
-#else
 constexpr size_t kMaxCrashKeyValueSize = 20320;
-#endif
-
 static_assert(kMaxCrashKeyValueSize < crashpad::Annotation::kValueMaxSize,
               "max crash key value length above what crashpad supports");
 
@@ -55,14 +48,8 @@ std::deque<std::string>& GetExtraCrashKeyNames() {
 }  // namespace
 
 constexpr uint32_t kMaxCrashKeyNameLength = 40;
-#if BUILDFLAG(IS_LINUX)
-static_assert(kMaxCrashKeyNameLength <=
-                  crash_reporter::internal::kCrashKeyStorageKeySize,
-              "max crash key name length above what breakpad supports");
-#else
 static_assert(kMaxCrashKeyNameLength <= crashpad::Annotation::kNameMaxLength,
               "max crash key name length above what crashpad supports");
-#endif
 
 void SetCrashKey(const std::string& key, const std::string& value) {
   // Chrome DCHECK()s if we try to set an annotation with a name longer than
@@ -70,11 +57,12 @@ void SetCrashKey(const std::string& key, const std::string& value) {
   if (key.size() >= kMaxCrashKeyNameLength) {
     node::Environment* env =
         node::Environment::GetCurrent(JavascriptEnvironment::GetIsolate());
-    EmitWarning(env,
-                "The crash key name, \"" + key + "\", is longer than " +
-                    std::to_string(kMaxCrashKeyNameLength) +
-                    " bytes, ignoring it.",
-                "electron");
+    EmitWarning(
+        env,
+        base::StringPrintf("The crash key name, \"%s\", is longer than %" PRIu32
+                           " bytes, ignoring it.",
+                           key.c_str(), kMaxCrashKeyNameLength),
+        "electron");
     return;
   }
 
@@ -112,30 +100,12 @@ void GetCrashKeys(std::map<std::string, std::string>* keys) {
 
 namespace {
 bool IsRunningAsNode() {
-#if BUILDFLAG(ENABLE_RUN_AS_NODE)
-  if (!electron::fuses::IsRunAsNodeEnabled())
-    return false;
-
-  return base::Environment::Create()->HasVar(electron::kRunAsNode);
-#else
-  return false;
-#endif
+  return electron::fuses::IsRunAsNodeEnabled() &&
+         base::Environment::Create()->HasVar(electron::kRunAsNode);
 }
 }  // namespace
 
 void SetCrashKeysFromCommandLine(const base::CommandLine& command_line) {
-#if BUILDFLAG(IS_LINUX)
-  if (command_line.HasSwitch(switches::kGlobalCrashKeys)) {
-    std::vector<std::pair<std::string, std::string>> global_crash_keys;
-    base::SplitStringIntoKeyValuePairs(
-        command_line.GetSwitchValueASCII(switches::kGlobalCrashKeys), '=', ',',
-        &global_crash_keys);
-    for (const auto& pair : global_crash_keys) {
-      SetCrashKey(pair.first, pair.second);
-    }
-  }
-#endif
-
   // NB. this is redundant with the 'ptype' key that //components/crash
   // reports; it's present for backwards compatibility.
   static crash_reporter::CrashKeyString<16> process_type_key("process_type");
@@ -167,6 +137,4 @@ void SetPlatformCrashKey() {
 #endif
 }
 
-}  // namespace crash_keys
-
-}  // namespace electron
+}  // namespace electron::crash_keys

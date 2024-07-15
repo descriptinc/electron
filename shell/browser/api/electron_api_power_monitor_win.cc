@@ -27,8 +27,8 @@ void PowerMonitor::InitPlatformSpecificMonitors() {
   WNDCLASSEX window_class;
   base::win::InitializeWindowClass(
       kPowerMonitorWindowClass,
-      &base::win::WrappedWindowProc<PowerMonitor::WndProcStatic>, 0, 0, 0, NULL,
-      NULL, NULL, NULL, NULL, &window_class);
+      &base::win::WrappedWindowProc<PowerMonitor::WndProcStatic>, 0, 0, 0,
+      nullptr, nullptr, nullptr, nullptr, nullptr, &window_class);
   instance_ = window_class.hInstance;
   atom_ = RegisterClassEx(&window_class);
 
@@ -44,15 +44,8 @@ void PowerMonitor::InitPlatformSpecificMonitors() {
 
   // For Windows 8 and later, a new "connected standby" mode has been added and
   // we must explicitly register for its notifications.
-  auto RegisterSuspendResumeNotification =
-      reinterpret_cast<decltype(&::RegisterSuspendResumeNotification)>(
-          GetProcAddress(GetModuleHandle(L"user32.dll"),
-                         "RegisterSuspendResumeNotification"));
-
-  if (RegisterSuspendResumeNotification) {
-    RegisterSuspendResumeNotification(static_cast<HANDLE>(window_),
-                                      DEVICE_NOTIFY_WINDOW_HANDLE);
-  }
+  RegisterSuspendResumeNotification(static_cast<HANDLE>(window_),
+                                    DEVICE_NOTIFY_WINDOW_HANDLE);
 }
 
 LRESULT CALLBACK PowerMonitor::WndProcStatic(HWND hwnd,

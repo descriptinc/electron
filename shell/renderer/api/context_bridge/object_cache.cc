@@ -4,15 +4,9 @@
 
 #include "shell/renderer/api/context_bridge/object_cache.h"
 
-#include <utility>
-
 #include "shell/common/api/object_life_monitor.h"
 
-namespace electron {
-
-namespace api {
-
-namespace context_bridge {
+namespace electron::api::context_bridge {
 
 ObjectCache::ObjectCache() = default;
 ObjectCache::~ObjectCache() = default;
@@ -23,7 +17,7 @@ void ObjectCache::CacheProxiedObject(v8::Local<v8::Value> from,
     auto obj = from.As<v8::Object>();
     int hash = obj->GetIdentityHash();
 
-    proxy_map_[hash].push_front(std::make_pair(from, proxy_value));
+    proxy_map_[hash].emplace_front(from, proxy_value);
   }
 }
 
@@ -50,8 +44,4 @@ v8::MaybeLocal<v8::Value> ObjectCache::GetCachedProxiedObject(
   return v8::MaybeLocal<v8::Value>();
 }
 
-}  // namespace context_bridge
-
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api::context_bridge

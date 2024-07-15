@@ -10,7 +10,8 @@
 #include <string>
 #include <vector>
 
-#include "base/callback.h"
+#include "base/functional/callback.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/spellcheck/renderer/spellcheck_worditerator.h"
 #include "third_party/blink/public/platform/web_spell_check_panel_host_client.h"
@@ -23,9 +24,7 @@ struct WebTextCheckingResult;
 class WebTextCheckingCompletion;
 }  // namespace blink
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 class SpellCheckClient : public blink::WebSpellCheckPanelHostClient,
                          public blink::WebTextCheckClient,
@@ -91,7 +90,7 @@ class SpellCheckClient : public blink::WebSpellCheckPanelHostClient,
   SpellcheckCharAttribute character_attributes_;
 
   // Represents word iterators used in this spellchecker. The |text_iterator_|
-  // splits text provided by WebKit into words, contractions, or concatenated
+  // splits text provided by Blink into words, contractions, or concatenated
   // words. The |contraction_iterator_| splits a concatenated word extracted by
   // |text_iterator_| into word components so we can treat a concatenated word
   // consisting only of correct words as a correct word.
@@ -99,18 +98,16 @@ class SpellCheckClient : public blink::WebSpellCheckPanelHostClient,
   SpellcheckWordIterator contraction_iterator_;
 
   // The parameters of a pending background-spellchecking request.
-  // (When WebKit sends two or more requests, we cancel the previous
+  // (When Blink sends two or more requests, we cancel the previous
   // requests so we do not have to use vectors.)
   std::unique_ptr<SpellcheckRequest> pending_request_param_;
 
-  v8::Isolate* isolate_;
+  raw_ptr<v8::Isolate> isolate_;
   v8::Global<v8::Context> context_;
   v8::Global<v8::Object> provider_;
   v8::Global<v8::Function> spell_check_;
 };
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api
 
 #endif  // ELECTRON_SHELL_RENDERER_API_ELECTRON_API_SPELL_CHECK_CLIENT_H_

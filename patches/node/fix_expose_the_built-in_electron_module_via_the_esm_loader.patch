@@ -1,0 +1,122 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Samuel Attard <sattard@salesforce.com>
+Date: Thu, 6 Oct 2022 04:09:16 -0700
+Subject: fix: expose the built-in electron module via the ESM loader
+
+This allows usage of `import { app } from 'electron'` and `import('electron')` natively in the browser + non-sandboxed renderer
+
+diff --git a/lib/internal/modules/esm/get_format.js b/lib/internal/modules/esm/get_format.js
+index 1931688e85d05ee2da4f88efb05d635cb43be233..afccc24392abff9eef2b9953fcffeb79ee71ad15 100644
+--- a/lib/internal/modules/esm/get_format.js
++++ b/lib/internal/modules/esm/get_format.js
+@@ -30,6 +30,7 @@ const protocolHandlers = {
+   'http:': getHttpProtocolModuleFormat,
+   'https:': getHttpProtocolModuleFormat,
+   'node:'() { return 'builtin'; },
++  'electron:'() { return 'electron'; },
+ };
+ 
+ /**
+diff --git a/lib/internal/modules/esm/load.js b/lib/internal/modules/esm/load.js
+index 5239bc8ed883a54df206d73c5dc0b70942c4f3df..6a15fcae677b3bda58fc85f705862bbcd9feec9d 100644
+--- a/lib/internal/modules/esm/load.js
++++ b/lib/internal/modules/esm/load.js
+@@ -142,7 +142,7 @@ async function defaultLoad(url, context = kEmptyObject) {
+       // Now that we have the source for the module, run `defaultGetFormat` to detect its format.
+       format = await defaultGetFormat(urlInstance, context);
+ 
+-      if (format === 'commonjs') {
++      if (format === 'electron' || format === 'commonjs') {
+         // For backward compatibility reasons, we need to discard the source in
+         // order for the CJS loader to re-fetch it.
+         source = null;
+@@ -224,6 +224,7 @@ function throwIfUnsupportedURLScheme(parsed, experimentalNetworkImports) {
+     protocol !== 'file:' &&
+     protocol !== 'data:' &&
+     protocol !== 'node:' &&
++    protocol !== 'electron:' &&
+     (
+       !experimentalNetworkImports ||
+       (
+@@ -232,7 +233,7 @@ function throwIfUnsupportedURLScheme(parsed, experimentalNetworkImports) {
+       )
+     )
+   ) {
+-    const schemes = ['file', 'data', 'node'];
++    const schemes = ['file', 'data', 'node', 'electron'];
+     if (experimentalNetworkImports) {
+       ArrayPrototypePush(schemes, 'https', 'http');
+     }
+diff --git a/lib/internal/modules/esm/resolve.js b/lib/internal/modules/esm/resolve.js
+index e73a8ad60a13925d6773c32cead8d04ec9d96ee7..52cdb7d5e14a18ed7b1b65e429729cf47dce3f98 100644
+--- a/lib/internal/modules/esm/resolve.js
++++ b/lib/internal/modules/esm/resolve.js
+@@ -741,6 +741,8 @@ function packageImportsResolve(name, base, conditions) {
+   throw importNotDefined(name, packageJSONUrl, base);
+ }
+ 
++const electronTypes = ['electron', 'electron/main', 'electron/common', 'electron/renderer'];
++
+ /**
+  * Returns the package type for a given URL.
+  * @param {URL} url - The URL to get the package type for.
+@@ -801,6 +803,11 @@ function packageResolve(specifier, base, conditions) {
+     return new URL('node:' + specifier);
+   }
+ 
++  const electronSpecifiers = new SafeSet(electronTypes);
++  if (electronSpecifiers.has(specifier)) {
++    return new URL('electron:electron');
++  }
++
+   const { packageName, packageSubpath, isScoped } =
+     parsePackageName(specifier, base);
+ 
+diff --git a/lib/internal/modules/esm/translators.js b/lib/internal/modules/esm/translators.js
+index 6772bbffd989d2257593bde76c94449dbd9272a8..232cf43c500056896eb754c15334858038b0525c 100644
+--- a/lib/internal/modules/esm/translators.js
++++ b/lib/internal/modules/esm/translators.js
+@@ -283,7 +283,7 @@ function createCJSModuleWrap(url, source, isMain, loadCJS = loadCJSModule) {
+ 
+   const { exportNames, module } = cjsPreparseModuleExports(filename, source);
+   cjsCache.set(url, module);
+-  const namesWithDefault = exportNames.has('default') ?
++  const namesWithDefault = filename === 'electron' ? ['default', ...Object.keys(module.exports)] : exportNames.has('default') ?
+     [...exportNames] : ['default', ...exportNames];
+ 
+   if (isMain) {
+@@ -305,8 +305,8 @@ function createCJSModuleWrap(url, source, isMain, loadCJS = loadCJSModule) {
+       ({ exports } = module);
+     }
+     for (const exportName of exportNames) {
+-      if (!ObjectPrototypeHasOwnProperty(exports, exportName) ||
+-          exportName === 'default') {
++      if (exportName === 'default' ||
++          !ObjectPrototypeHasOwnProperty(exports, exportName)) {
+         continue;
+       }
+       // We might trigger a getter -> dont fail.
+@@ -331,6 +331,10 @@ translators.set('require-commonjs', (url, source, isMain) => {
+   return createCJSModuleWrap(url, source);
+ });
+ 
++translators.set('electron', () => {
++  return createCJSModuleWrap('electron', '');
++});
++
+ // Handle CommonJS modules referenced by `import` statements or expressions,
+ // or as the initial entry point when the ESM loader handles a CommonJS entry.
+ translators.set('commonjs', async function commonjsStrategy(url, source,
+diff --git a/lib/internal/url.js b/lib/internal/url.js
+index 34fb672ecb62b83cfb6a3a7484354165f4b02a85..679cb1302dfeb4a50d34219efccc73b518587066 100644
+--- a/lib/internal/url.js
++++ b/lib/internal/url.js
+@@ -1459,6 +1459,8 @@ function fileURLToPath(path, options = kEmptyObject) {
+     path = new URL(path);
+   else if (!isURL(path))
+     throw new ERR_INVALID_ARG_TYPE('path', ['string', 'URL'], path);
++  if (path.protocol === 'electron:')
++    return 'electron';
+   if (path.protocol !== 'file:')
+     throw new ERR_INVALID_URL_SCHEME('file');
+   return (windows ?? isWindows) ? getPathFromURLWin32(path) : getPathFromURLPosix(path);

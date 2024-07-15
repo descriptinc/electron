@@ -39,7 +39,7 @@ class URLPipeLoader : public network::mojom::URLLoader,
                 mojo::PendingReceiver<network::mojom::URLLoader> loader,
                 mojo::PendingRemote<network::mojom::URLLoaderClient> client,
                 const net::NetworkTrafficAnnotationTag& annotation,
-                base::DictionaryValue upload_data);
+                base::Value::Dict upload_data);
 
   // disable copy
   URLPipeLoader(const URLPipeLoader&) = delete;
@@ -51,7 +51,7 @@ class URLPipeLoader : public network::mojom::URLLoader,
   void Start(scoped_refptr<network::SharedURLLoaderFactory> factory,
              std::unique_ptr<network::ResourceRequest> request,
              const net::NetworkTrafficAnnotationTag& annotation,
-             base::DictionaryValue upload_data);
+             base::Value::Dict upload_data);
   void NotifyComplete(int result);
   void OnResponseStarted(const GURL& final_url,
                          const network::mojom::URLResponseHead& response_head);
@@ -68,7 +68,7 @@ class URLPipeLoader : public network::mojom::URLLoader,
       const std::vector<std::string>& removed_headers,
       const net::HttpRequestHeaders& modified_headers,
       const net::HttpRequestHeaders& modified_cors_exempt_headers,
-      const absl::optional<GURL>& new_url) override {}
+      const std::optional<GURL>& new_url) override {}
   void SetPriority(net::RequestPriority priority,
                    int32_t intra_priority_value) override {}
   void PauseReadingBodyFromNet() override {}

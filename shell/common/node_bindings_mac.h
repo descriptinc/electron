@@ -13,14 +13,9 @@ namespace electron {
 class NodeBindingsMac : public NodeBindings {
  public:
   explicit NodeBindingsMac(BrowserEnvironment browser_env);
-  ~NodeBindingsMac() override;
-
-  void RunMessageLoop() override;
 
  private:
-  // Called when uv's watcher queue changes.
-  static void OnWatcherQueueChanged(uv_loop_t* loop);
-
+  // NodeBindings
   void PollEvents() override;
 };
 

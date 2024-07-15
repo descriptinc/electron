@@ -4,15 +4,18 @@
 
 #include "shell/renderer/api/electron_api_spell_check_client.h"
 
+#include <iterator>
 #include <memory>
 #include <set>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "base/containers/contains.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
-#include "base/threading/thread_task_runner_handle.h"
+#include "base/task/single_thread_task_runner.h"
 #include "components/spellcheck/renderer/spellcheck_worditerator.h"
 #include "shell/common/gin_helper/dictionary.h"
 #include "shell/common/gin_helper/function_template.h"
@@ -21,9 +24,7 @@
 #include "third_party/blink/public/web/web_text_checking_result.h"
 #include "third_party/icu/source/common/unicode/uscript.h"
 
-namespace electron {
-
-namespace api {
+namespace electron::api {
 
 namespace {
 
@@ -65,7 +66,7 @@ class SpellCheckClient::SpellcheckRequest {
  private:
   std::u16string text_;          // Text to be checked in this task.
   std::vector<Word> word_list_;  // List of Words found in text
-  // The interface to send the misspelled ranges to WebKit.
+  // The interface to send the misspelled ranges to Blink.
   std::unique_ptr<blink::WebTextCheckingCompletion> completion_;
 };
 
@@ -107,7 +108,7 @@ void SpellCheckClient::RequestCheckingOfText(
   pending_request_param_ =
       std::make_unique<SpellcheckRequest>(text, std::move(completionCallback));
 
-  base::ThreadTaskRunnerHandle::Get()->PostTask(
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
       base::BindOnce(&SpellCheckClient::SpellCheckText, AsWeakPtr()));
 }
@@ -147,7 +148,7 @@ void SpellCheckClient::SpellCheckText() {
     return;
   }
 
-  text_iterator_.SetText(text.c_str(), text.size());
+  text_iterator_.SetText(text);
 
   SpellCheckScope scope(*this);
   std::u16string word;
@@ -193,13 +194,13 @@ void SpellCheckClient::OnSpellCheckDone(
   auto& word_list = pending_request_param_->wordlist();
 
   for (const auto& word : word_list) {
-    if (misspelled.find(word.text) != misspelled.end()) {
+    if (base::Contains(misspelled, word.text)) {
       // If this is a contraction, iterate through parts and accept the word
       // if none of them are misspelled
       if (!word.contraction_words.empty()) {
         auto all_correct = true;
         for (const auto& contraction_word : word.contraction_words) {
-          if (misspelled.find(contraction_word) != misspelled.end()) {
+          if (base::Contains(misspelled, contraction_word)) {
             all_correct = false;
             break;
           }
@@ -218,18 +219,19 @@ void SpellCheckClient::SpellCheckWords(const SpellCheckScope& scope,
                                        const std::set<std::u16string>& words) {
   DCHECK(!scope.spell_check_.IsEmpty());
 
+  auto context = isolate_->GetCurrentContext();
   gin_helper::MicrotasksScope microtasks_scope(
-      isolate_, v8::MicrotasksScope::kDoNotRunMicrotasks);
+      isolate_, context->GetMicrotaskQueue(),
+      v8::MicrotasksScope::kDoNotRunMicrotasks);
 
   v8::Local<v8::FunctionTemplate> templ = gin_helper::CreateFunctionTemplate(
       isolate_,
       base::BindRepeating(&SpellCheckClient::OnSpellCheckDone, AsWeakPtr()));
-
-  auto context = isolate_->GetCurrentContext();
   v8::Local<v8::Value> args[] = {gin::ConvertToV8(isolate_, words),
                                  templ->GetFunction(context).ToLocalChecked()};
   // Call javascript with the words and the callback function
-  scope.spell_check_->Call(context, scope.provider_, 2, args).IsEmpty();
+  scope.spell_check_->Call(context, scope.provider_, std::size(args), args)
+      .IsEmpty();
 }
 
 // Returns whether or not the given string is a contraction.
@@ -244,7 +246,7 @@ bool SpellCheckClient::IsContraction(
     std::vector<std::u16string>* contraction_words) {
   DCHECK(contraction_iterator_.IsInitialized());
 
-  contraction_iterator_.SetText(contraction.c_str(), contraction.length());
+  contraction_iterator_.SetText(contraction);
 
   std::u16string word;
   size_t word_start;
@@ -273,6 +275,4 @@ SpellCheckClient::SpellCheckScope::SpellCheckScope(
 
 SpellCheckClient::SpellCheckScope::~SpellCheckScope() = default;
 
-}  // namespace api
-
-}  // namespace electron
+}  // namespace electron::api

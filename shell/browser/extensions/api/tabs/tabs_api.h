@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "base/memory/raw_ptr.h"
 #include "extensions/browser/api/execute_code_function.h"
 #include "extensions/browser/extension_function.h"
 #include "extensions/common/extension_resource.h"
@@ -46,9 +47,27 @@ class TabsExecuteScriptFunction : public ExecuteCodeInTabFunction {
   DECLARE_EXTENSION_FUNCTION("tabs.executeScript", TABS_EXECUTESCRIPT)
 };
 
+class TabsReloadFunction : public ExtensionFunction {
+  ~TabsReloadFunction() override {}
+
+  ResponseAction Run() override;
+
+  DECLARE_EXTENSION_FUNCTION("tabs.reload", TABS_RELOAD)
+};
+
+class TabsQueryFunction : public ExtensionFunction {
+  ~TabsQueryFunction() override {}
+
+  ResponseAction Run() override;
+
+  DECLARE_EXTENSION_FUNCTION("tabs.query", TABS_QUERY)
+};
+
 class TabsGetFunction : public ExtensionFunction {
   ~TabsGetFunction() override {}
+
   ResponseAction Run() override;
+
   DECLARE_EXTENSION_FUNCTION("tabs.get", TABS_GET)
 };
 
@@ -97,13 +116,10 @@ class TabsUpdateFunction : public ExtensionFunction {
   bool UpdateURL(const std::string& url, int tab_id, std::string* error);
   ResponseValue GetResult();
 
-  content::WebContents* web_contents_;
+  raw_ptr<content::WebContents> web_contents_;
 
  private:
   ResponseAction Run() override;
-  void OnExecuteCodeFinished(const std::string& error,
-                             const GURL& on_url,
-                             const base::ListValue& script_result);
 
   DECLARE_EXTENSION_FUNCTION("tabs.update", TABS_UPDATE)
 };

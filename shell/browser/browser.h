@@ -6,6 +6,7 @@
 #define ELECTRON_SHELL_BROWSER_BROWSER_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "gin/dictionary.h"
 #include "shell/browser/browser_observer.h"
 #include "shell/browser/window_list_observer.h"
+#include "shell/common/gin_converters/login_item_settings_converter.h"
 #include "shell/common/gin_helper/promise.h"
 
 #if BUILDFLAG(IS_WIN)
@@ -40,8 +42,50 @@ namespace electron {
 
 class ElectronMenuModel;
 
+#if BUILDFLAG(IS_WIN)
+struct LaunchItem {
+  std::wstring name;
+  std::wstring path;
+  std::wstring scope;
+  std::vector<std::wstring> args;
+  bool enabled = true;
+
+  LaunchItem();
+  ~LaunchItem();
+  LaunchItem(const LaunchItem&);
+};
+#endif
+
+struct LoginItemSettings {
+  bool open_at_login = false;
+  bool open_as_hidden = false;
+  bool restore_state = false;
+  bool opened_at_login = false;
+  bool opened_as_hidden = false;
+  std::u16string path;
+  std::vector<std::u16string> args;
+
+#if BUILDFLAG(IS_MAC)
+  std::string type = "mainAppService";
+  std::string service_name;
+  std::string status;
+#elif BUILDFLAG(IS_WIN)
+  // used in browser::setLoginItemSettings
+  bool enabled = true;
+  std::wstring name;
+
+  // used in browser::getLoginItemSettings
+  bool executable_will_launch_at_login = false;
+  std::vector<LaunchItem> launch_items;
+#endif
+
+  LoginItemSettings();
+  ~LoginItemSettings();
+  LoginItemSettings(const LoginItemSettings&);
+};
+
 // This class is used for control application-wide operations.
-class Browser : public WindowListObserver {
+class Browser : private WindowListObserver {
  public:
   Browser();
   ~Browser() override;
@@ -108,49 +152,11 @@ class Browser : public WindowListObserver {
 #endif
 
   // Set/Get the badge count.
-  bool SetBadgeCount(absl::optional<int> count);
-  int GetBadgeCount();
+  bool SetBadgeCount(std::optional<int> count);
+  [[nodiscard]] int badge_count() const { return badge_count_; }
 
-#if BUILDFLAG(IS_WIN)
-  struct LaunchItem {
-    std::wstring name;
-    std::wstring path;
-    std::wstring scope;
-    std::vector<std::wstring> args;
-    bool enabled = true;
-
-    LaunchItem();
-    ~LaunchItem();
-    LaunchItem(const LaunchItem&);
-  };
-#endif
-
-  // Set/Get the login item settings of the app
-  struct LoginItemSettings {
-    bool open_at_login = false;
-    bool open_as_hidden = false;
-    bool restore_state = false;
-    bool opened_at_login = false;
-    bool opened_as_hidden = false;
-    std::u16string path;
-    std::vector<std::u16string> args;
-
-#if BUILDFLAG(IS_WIN)
-    // used in browser::setLoginItemSettings
-    bool enabled = true;
-    std::wstring name;
-
-    // used in browser::getLoginItemSettings
-    bool executable_will_launch_at_login = false;
-    std::vector<LaunchItem> launch_items;
-#endif
-
-    LoginItemSettings();
-    ~LoginItemSettings();
-    LoginItemSettings(const LoginItemSettings&);
-  };
   void SetLoginItemSettings(LoginItemSettings settings);
-  LoginItemSettings GetLoginItemSettings(const LoginItemSettings& options);
+  v8::Local<v8::Value> GetLoginItemSettings(const LoginItemSettings& options);
 
 #if BUILDFLAG(IS_MAC)
   // Set the handler which decides whether to shutdown.
@@ -158,13 +164,14 @@ class Browser : public WindowListObserver {
 
   // Hide the application.
   void Hide();
+  bool IsHidden();
 
   // Show the application.
   void Show();
 
   // Creates an activity and sets it as the one currently in use.
   void SetUserActivity(const std::string& type,
-                       base::DictionaryValue user_info,
+                       base::Value::Dict user_info,
                        gin::Arguments* args);
 
   // Returns the type name of the current user activity.
@@ -179,7 +186,7 @@ class Browser : public WindowListObserver {
 
   // Updates the current user activity
   void UpdateCurrentActivity(const std::string& type,
-                             base::DictionaryValue user_info);
+                             base::Value::Dict user_info);
 
   // Indicates that an user activity is about to be resumed.
   bool WillContinueUserActivity(const std::string& type);
@@ -190,16 +197,18 @@ class Browser : public WindowListObserver {
 
   // Resumes an activity via hand-off.
   bool ContinueUserActivity(const std::string& type,
-                            base::DictionaryValue user_info,
-                            base::DictionaryValue details);
+                            base::Value::Dict user_info,
+                            base::Value::Dict details);
 
   // Indicates that an activity was continued on another device.
   void UserActivityWasContinued(const std::string& type,
-                                base::DictionaryValue user_info);
+                                base::Value::Dict user_info);
 
   // Gives an opportunity to update the Handoff payload.
   bool UpdateUserActivityState(const std::string& type,
-                               base::DictionaryValue user_info);
+                               base::Value::Dict user_info);
+
+  void ApplyForcedRTL();
 
   // Bounce the dock icon.
   enum class BounceType{
@@ -227,10 +236,14 @@ class Browser : public WindowListObserver {
   // Set docks' icon.
   void DockSetIcon(v8::Isolate* isolate, v8::Local<v8::Value> icon);
 
+  void SetLaunchedAtLogin(bool launched_at_login) {
+    was_launched_at_login_ = launched_at_login;
+  }
+
 #endif  // BUILDFLAG(IS_MAC)
 
   void ShowAboutPanel();
-  void SetAboutPanelOptions(base::DictionaryValue options);
+  void SetAboutPanelOptions(base::Value::Dict options);
 
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
   void ShowEmojiPanel();
@@ -275,8 +288,11 @@ class Browser : public WindowListObserver {
   // Tell the application to create a new window for a tab.
   void NewWindowForTab();
 
-  // Tell the application that application did become active
+  // Indicate that the app is now active.
   void DidBecomeActive();
+  // Indicate that the app is no longer active and doesn’t have focus.
+  void DidResignActive();
+
 #endif  // BUILDFLAG(IS_MAC)
 
   // Tell the application that application is activated with visible/invisible
@@ -287,7 +303,7 @@ class Browser : public WindowListObserver {
 
   // Tell the application the loading has been done.
   void WillFinishLaunching();
-  void DidFinishLaunching(base::DictionaryValue launch_info);
+  void DidFinishLaunching(base::Value::Dict launch_info);
 
   void OnAccessibilitySupportChanged();
 
@@ -358,17 +374,14 @@ class Browser : public WindowListObserver {
 #if BUILDFLAG(IS_MAC)
   std::unique_ptr<ui::ScopedPasswordInputEnabler> password_input_enabler_;
   base::Time last_dock_show_;
+  bool was_launched_at_login_;
 #endif
 
-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
-  base::Value about_panel_options_;
-#elif BUILDFLAG(IS_MAC)
-  base::DictionaryValue about_panel_options_;
-#endif
+  base::Value::Dict about_panel_options_;
 
 #if BUILDFLAG(IS_WIN)
   void UpdateBadgeContents(HWND hwnd,
-                           const absl::optional<std::string>& badge_content,
+                           const std::optional<std::string>& badge_content,
                            const std::string& badge_alt_string);
 
   // In charge of running taskbar related APIs.

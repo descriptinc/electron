@@ -5,9 +5,6 @@ const args = require('minimist')(process.argv.slice(2), {
   string: ['tag', 'releaseID'],
   default: { releaseID: '' }
 });
-const { execSync } = require('child_process');
-const { GitProcess } = require('dugite');
-const { getCurrentBranch, ELECTRON_DIR } = require('../lib/utils.js');
 const { Octokit } = require('@octokit/rest');
 
 const octokit = new Octokit({
@@ -17,26 +14,6 @@ const octokit = new Octokit({
 require('colors');
 const pass = '✓'.green;
 const fail = '✗'.red;
-
-function getLastBumpCommit (tag) {
-  const data = execSync(`git log -n1 --grep "Bump ${tag}" --format='format:{"hash": "%H", "message": "%s"}'`).toString();
-  return JSON.parse(data);
-}
-
-async function revertBumpCommit (tag) {
-  const branch = await getCurrentBranch();
-  const commitToRevert = getLastBumpCommit(tag).hash;
-  await GitProcess.exec(['pull', '--rebase']);
-  await GitProcess.exec(['revert', commitToRevert], ELECTRON_DIR);
-  const pushDetails = await GitProcess.exec(['push', 'origin', `HEAD:${branch}`, '--follow-tags'], ELECTRON_DIR);
-  if (pushDetails.exitCode === 0) {
-    console.log(`${pass} successfully reverted release commit.`);
-  } else {
-    const error = GitProcess.parseError(pushDetails.stderr);
-    console.error(`${fail} could not push release commit: `, error);
-    process.exit(1);
-  }
-}
 
 async function deleteDraft (releaseId, targetRepo) {
   try {
@@ -79,9 +56,6 @@ async function deleteTag (tag, targetRepo) {
 async function cleanReleaseArtifacts () {
   const releaseId = args.releaseID.length > 0 ? args.releaseID : null;
   const isNightly = args.tag.includes('nightly');
-
-  // try to revert commit regardless of tag and draft deletion status
-  await revertBumpCommit(args.tag);
 
   if (releaseId) {
     if (isNightly) {

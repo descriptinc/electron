@@ -6,7 +6,6 @@
 
 #include <memory>
 
-#include "base/task/post_task.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "shell/browser/ui/views/menu_bar.h"
@@ -35,14 +34,15 @@ void MenuDelegate::RunMenu(ElectronMenuModel* model,
     hold_first_switch_ = true;
   }
 
-  id_ = button->tag();
+  id_ = button->GetID();
   adapter_ = std::make_unique<MenuModelAdapter>(model);
 
-  auto* item = new views::MenuItemView(this);
-  static_cast<MenuModelAdapter*>(adapter_.get())->BuildMenu(item);
+  auto item = std::make_unique<views::MenuItemView>(this);
+  static_cast<MenuModelAdapter*>(adapter_.get())->BuildMenu(item.get());
 
   menu_runner_ = std::make_unique<views::MenuRunner>(
-      item, views::MenuRunner::CONTEXT_MENU | views::MenuRunner::HAS_MNEMONICS);
+      std::move(item),
+      views::MenuRunner::CONTEXT_MENU | views::MenuRunner::HAS_MNEMONICS);
   menu_runner_->RunMenuAt(
       button->GetWidget()->GetTopLevelWidget(),
       static_cast<views::MenuButton*>(button)->button_controller(), bounds,
@@ -78,7 +78,7 @@ const gfx::FontList* MenuDelegate::GetLabelFontList(int id) const {
   return adapter_->GetLabelFontList(id);
 }
 
-absl::optional<SkColor> MenuDelegate::GetLabelColor(int id) const {
+std::optional<SkColor> MenuDelegate::GetLabelColor(int id) const {
   return adapter_->GetLabelColor(id);
 }
 
@@ -128,14 +128,14 @@ views::MenuItemView* MenuDelegate::GetSiblingMenu(
   views::MenuButton* button;
   ElectronMenuModel* model;
   if (menu_bar_->GetMenuButtonFromScreenPoint(screen_point, &model, &button) &&
-      button->tag() != id_) {
+      button->GetID() != id_) {
     bool switch_in_progress = !!button_to_open_;
     // Always update target to open.
     button_to_open_ = button;
     // Switching menu asynchronously to avoid crash.
     if (!switch_in_progress) {
-      base::PostTask(FROM_HERE, {content::BrowserThread::UI},
-                     base::BindOnce(&views::MenuRunner::Cancel,
+      content::GetUIThreadTaskRunner({})->PostTask(
+          FROM_HERE, base::BindOnce(&views::MenuRunner::Cancel,
                                     base::Unretained(menu_runner_.get())));
     }
   }

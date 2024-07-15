@@ -5,12 +5,11 @@
 #include "shell/common/asar/asar_util.h"
 
 #include <map>
+#include <memory>
 #include <string>
-#include <utility>
 
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
-#include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
 #include "base/stl_util.h"
@@ -18,10 +17,10 @@
 #include "base/strings/string_util.h"
 #include "base/synchronization/lock.h"
 #include "base/threading/thread_local.h"
-#include "base/threading/thread_restrictions.h"
 #include "crypto/secure_hash.h"
 #include "crypto/sha2.h"
 #include "shell/common/asar/archive.h"
+#include "shell/common/thread_restrictions.h"
 
 namespace asar {
 
@@ -43,7 +42,7 @@ bool IsDirectoryCached(const base::FilePath& path) {
   if (it != is_directory_cache.end()) {
     return it->second;
   }
-  base::ThreadRestrictions::ScopedAllowIO allow_io;
+  electron::ScopedAllowBlockingForElectron allow_blocking;
   return is_directory_cache[path] = base::DirectoryExists(path);
 }
 
@@ -152,7 +151,7 @@ bool ReadFileToString(const base::FilePath& path, std::string* contents) {
 void ValidateIntegrityOrDie(const char* data,
                             size_t size,
                             const IntegrityPayload& integrity) {
-  if (integrity.algorithm == HashAlgorithm::SHA256) {
+  if (integrity.algorithm == HashAlgorithm::kSHA256) {
     uint8_t hash[crypto::kSHA256Length];
     auto hasher = crypto::SecureHash::Create(crypto::SecureHash::SHA256);
     hasher->Update(data, size);
